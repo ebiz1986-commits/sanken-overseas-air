@@ -1,0 +1,125 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "System user with role-based access",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "full_name": { "type": "string" },
+        "role": { "type": "string", "enum": ["ADMIN1", "AGENT", "FINANCE", "ADMIN"] },
+        "is_active": { "type": "boolean" },
+        "must_change_password": { "type": "boolean" }
+      },
+      "required": ["id", "email", "full_name", "role", "is_active"]
+    },
+    "Ticket": {
+      "title": "Ticket",
+      "description": "Travel ticket request tracking",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "pp_number": { "type": "string" },
+        "passenger_name": { "type": "string" },
+        "status": { "type": "string" },
+        "project_id": { "type": "string" },
+        "stage1_completed": { "type": "boolean" },
+        "stage2_completed": { "type": "boolean" },
+        "stage3_completed": { "type": "boolean" },
+        "flight_status": { "type": "string" }
+      },
+      "required": ["id", "pp_number", "passenger_name", "status", "project_id"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Project tracking",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "budget_allocated": { "type": "number" }
+      },
+      "required": ["id", "name", "budget_allocated"]
+    },
+    "TicketTask": {
+      "title": "TicketTask",
+      "description": "Tasks associated with tickets",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ticket_id": { "type": "string" },
+        "title": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "ticket_id", "title", "status"]
+    },
+    "Option": {
+      "title": "Option",
+      "description": "Application options",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "category": { "type": "string" },
+        "value": { "type": "string" }
+      },
+      "required": ["id", "category", "value"]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "Activity logs for tickets",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ticket_id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "action": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ticket_id", "user_id", "action"]
+    },
+    "BypassPassport": {
+      "title": "BypassPassport",
+      "description": "Passport numbers that bypass duplicate booking restrictions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "pp_number": { "type": "string" },
+        "name": { "type": "string" },
+        "created_by_user_id": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "pp_number", "name"]
+    }
+  },
+  "firestore": {
+    "users": {
+        "schema": { "$ref": "User" },
+        "description": "Users collection"
+    },
+    "tickets": {
+        "schema": { "$ref": "Ticket" },
+        "description": "Tickets collection"
+    },
+    "projects": {
+        "schema": { "$ref": "Project" },
+        "description": "Projects collection"
+    },
+    "ticket_tasks": {
+        "schema": { "$ref": "TicketTask" },
+        "description": "Ticket tasks collection"
+    },
+    "options": {
+        "schema": { "$ref": "Option" },
+        "description": "Options collection"
+    },
+    "activity_logs": {
+        "schema": { "$ref": "ActivityLog" },
+        "description": "Activity logs collection"
+    },
+    "bypass_passports": {
+        "schema": { "$ref": "BypassPassport" },
+        "description": "Bypass duplicate booking passports"
+    }
+  }
+}

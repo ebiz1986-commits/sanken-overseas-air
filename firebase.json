@@ -1,0 +1,6 @@
+{
+  "firestore": {
+    "database": "ai-studio-sankenoverseasai-767bf181-3c9d-4c14-92ee-cb387d9f3af0",
+    "rules": "firestore.rules"
+  }
+}

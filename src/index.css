@@ -1,0 +1,214 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Montserrat:wght@300;400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--color-slate-50);
+    color: var(--color-slate-900);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  .dark body { /* Using custom standard override to flip backgrounds */
+    background-color: #0f172a;
+    color: #f1f5f9;
+  }
+  .dark .bg-slate-50 { background-color: #0f172a !important; }
+  .dark .bg-white { background-color: #1e293b !important; }
+  .dark .bg-slate-100 { background-color: #1e293b !important; }
+  .dark .bg-slate-200 { background-color: #334155 !important; }
+  .dark .text-slate-800, .dark .text-slate-900 { color: #f8fafc !important; }
+  .dark .text-slate-700 { color: #e2e8f0 !important; }
+  .dark .text-slate-600 { color: #cbd5e1 !important; }
+  .dark .text-slate-500 { color: #94a3b8 !important; }
+  .dark .text-slate-400 { color: #64748b !important; }
+  .dark .border-slate-200, .dark .border-slate-300 { border-color: #334155 !important; }
+  .dark .hover\:bg-slate-50:hover { background-color: #1e293b !important; }
+  .dark .hover\:bg-slate-100:hover { background-color: #334155 !important; }
+  .dark .hover\:text-slate-800:hover { color: #ffffff !important; }
+  .dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
+  .dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
+    border-color: #334155 !important;
+  }
+  h1, h2, h3, h4, h5, h6, .text-lg, .text-xl, .text-2xl, .text-3xl, .text-4xl, .text-5xl {
+    font-family: var(--font-display);
+    letter-spacing: -0.025em;
+  }
+  .font-mono, select, input, .font-code, [class*="font-mono"] {
+    font-family: var(--font-mono);
+  }
+  table, table th, table td, table select, table input, table button, .font-table {
+    font-family: var(--font-table) !important;
+  }
+  .dark input, .dark select, .dark textarea {
+    background-color: #0f172a;
+    color: #f1f5f9;
+    border-color: #334155 !important;
+  }
+  .dark .bg-emerald-50 { background-color: rgba(5, 150, 105, 0.2) !important; }
+  .dark .bg-red-50 { background-color: rgba(220, 38, 38, 0.2) !important; }
+  .dark .bg-amber-50 { background-color: rgba(217, 119, 6, 0.2) !important; }
+  .dark .text-emerald-800, .dark .text-emerald-700, .dark .text-emerald-600 { color: #34d399 !important; }
+  .dark .text-red-800, .dark .text-red-700, .dark .text-red-600 { color: #f87171 !important; }
+  .dark .text-amber-800, .dark .text-amber-700, .dark .text-amber-600 { color: #fbbf24 !important; }
+}
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Outfit', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  --font-table: 'Proxima Nova', 'proxima-nova', 'Montserrat', 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+  /* === SKOA BRAND TOKENS — High-Contrast Desktop-Optimized Theme === */
+  --color-brand-bg: #f1f5f9;            /* Deeper slate gray background for absolute card separation */
+  --color-brand-bg-elevated: #e2e8f0;   /* Distinct elevated panel backdrop */
+  --color-brand-surface: #ffffff;       /* High-contrast pure white cards */
+  --color-brand-border: #cbd5e1;        /* Darker, very visible standard boundaries */
+  --color-brand-border-strong: #94a3b8; /* Enhanced input focus borders / outlines */
+
+  --color-brand-text-muted: #475569;    /* High-readability secondary/helper text */
+  --color-brand-text-secondary: #334155;/* Crisper subtitle text */
+  --color-brand-text: #0f172a;          /* Deeper dark slate paragraph bodies */
+  --color-brand-text-strong: #000000;   /* Pure black headers and critical stats */
+
+  --color-brand-accent: #175e96;        /* Deepened Sanken Royal Blue (Left Diamond) */
+  --color-brand-accent-soft: #2e8bd0;   /* Richer Sanken Sky Blue (Middle Diamond) */
+
+  --color-brand-success: #059669;       /* Darker success green */
+  --color-brand-warning: #d97706;       /* Darker warning amber */
+  --color-brand-danger:  #dc2626;       /* Darker error red */
+}
+
+/* === LEGACY MAPPINGS — Restoring Tailwind's standard light palette === */
+@theme {
+  --color-slate-50:  #f1f5f9;             /* Deeper backdrop so pure white panels clearly pop */
+  --color-slate-100: #e2e8f0;             /* Enhanced outline/divider backdrop */
+  --color-slate-200: #cbd5e1;             /* Pronounced card borders and partitions */
+  --color-slate-300: #94a3b8;             /* Solid grey labels and placeholders */
+  --color-slate-400: #64748b;             /* Highly legible secondary copy */
+  --color-slate-500: #475569;             /* Slate text */
+  --color-slate-600: #334155;             /* Deep slate standard text */
+  --color-slate-700: #1e293b;             /* Crisp near-black */
+  --color-slate-800: #0f172a;             /* Deep solid slate */
+  --color-slate-900: #020617;             /* Darkest slate absolute black */
+
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  --color-sky-50: #dceffa;              /* Richer, darker ice blue for text contrast inside badges */
+  --color-sky-100: #bde0f7;             /* High-contrast sky blue background for active highlights */
+  --color-sky-200: #93ccf3;             /* Accent sky blue boundary */
+  --color-sky-500: #2e8bd0;             /* Middle Sanken Diamond Blue (Optimized for desktop) */
+  --color-sky-600: #175e96;             /* Sanken Royal Blue brand color */
+  --color-sky-700: #114670;             /* Sanken Navy Accent */
+  --color-sky-800: #0a2d49;             /* Sanken Deep Indigo Blue */
+  --color-emerald-50: #d1fae5;          /* Darkened emerald backdrop for success alert boxes */
+  --color-emerald-100: #a7f3d0;         /* High-contrast success border */
+  --color-emerald-500: #059669;         /* Dark green body text on success states */
+  --color-emerald-600: #047857;         /* Strong contrast forest green */
+  --color-emerald-700: #065f46;         /* Extremely high contrast green title */
+  --color-amber-50: #fef3c7;            /* Deeper warm gold warning box */
+  --color-amber-100: #fde68a;           /* Stronger warm gold highlight border */
+  --color-amber-500: #d97706;           /* Premium high-contrast amber body text */
+  --color-amber-600: #b45309;           /* Pure dark honey for maximum readability */
+  --color-red-50: #fee2e2;              /* High-contrast pastel red exception backdrop */
+  --color-red-100: #fecaca;             /* High-contrast emergency boundary line */
+  --color-red-200: #fca5a5;             /* Enhanced red alert border highlight */
+  --color-red-500: #dc2626;             /* Deeper dangerous error red body text */
+  --color-indigo-50: #e0e7ff;           /* Distinct purple-blue shadow backdrop */
+  --color-indigo-100: #c7d2fe;          /* High contrast Indigo marker */
+  --color-indigo-200: #a5b4fc;          /* Rich boundaries */
+  --color-indigo-400: #6366f1;          /* Bright indigo high contrast accents */
+  --color-indigo-600: #4338ca;          /* Perfect visual royal purple */
+  --color-indigo-700: #3730a3;          /* Dark majestic purple-navy */
+}
+
+@media print {
+  /* Hide chrome */
+  nav,
+  button,
+  .no-print,
+  [role="dialog"] {
+    display: none !important;
+  }
+  /* Light background for ink savings */
+  body, .min-h-screen {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  /* Expand content full-width */
+  main {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+  /* Cards on white */
+  .bg-white, .bg-brand-surface {
+    background: #ffffff !important;
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+  }
+  /* Text on white */
+  .text-slate-900, .text-slate-800, .text-slate-700, .text-slate-600,
+  .text-brand-text, .text-brand-text-strong {
+    color: #000 !important;
+  }
+  /* Avoid breaking ticket sections */
+  .print-keep-together {
+    break-inside: avoid;
+  }
+}
+
+@layer utilities {
+  .hide-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@keyframes flash-grow {
+  0% {
+    transform: scale(0.96);
+    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.7);
+    border-color: rgba(249, 115, 22, 0.8);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 0 25px 8px rgba(249, 115, 22, 0.55);
+    background-color: rgba(254, 215, 170, 0.25);
+    border-color: rgba(249, 115, 22, 1);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0);
+    border-color: rgba(251, 146, 60, 0.3);
+  }
+}
+
+.animate-flash-grow {
+  animation: flash-grow 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) 1;
+}
+
+@keyframes pulse-glowing-red {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 4px rgba(239, 68, 68, 0.4);
+    border-color: rgba(239, 68, 68, 0.4);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 14px rgba(239, 68, 68, 0.855);
+    border-color: rgba(239, 68, 68, 1);
+    background-color: rgba(254, 226, 226, 0.3);
+    opacity: 0.95;
+  }
+}
+
+.animate-pulse-glowing-red {
+  animation: pulse-glowing-red 2s infinite ease-in-out;
+}
+
+

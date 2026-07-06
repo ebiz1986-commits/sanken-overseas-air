@@ -1,0 +1,6 @@
+{
+  "name": "sankenoverseasair",
+  "description": "A comprehensive internal tracking system for HR, Agents, and Finance to manage Sanken's air ticketing workflow.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
