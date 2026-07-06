@@ -1730,13 +1730,18 @@ export default function SadminDashboard() {
                       ) : (
                         <div className="h-72">
                           <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={a1ProjectTicketDistribution}>
+                            <BarChart data={a1ProjectTicketDistribution} margin={{ bottom: 15 }}>
                               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                               <XAxis 
                                 dataKey="name" 
                                 axisLine={false} 
                                 tickLine={false} 
                                 tick={{ fontSize: 10, fill: '#64748B', fontWeight: 500 }} 
+                                interval={0}
+                                angle={-20}
+                                textAnchor="end"
+                                height={55}
+                                tickFormatter={(val) => val && val.length > 20 ? `${val.substring(0, 18)}...` : val}
                               />
                               <YAxis 
                                 axisLine={false} 
@@ -2325,9 +2330,19 @@ export default function SadminDashboard() {
                       </div>
                       <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={projectsListWithSpent}>
+                          <BarChart data={projectsListWithSpent} margin={{ bottom: 15 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
+                            <XAxis 
+                              dataKey="name" 
+                              axisLine={false} 
+                              tickLine={false} 
+                              tick={{ fontSize: 10, fill: '#64748B', fontWeight: 500 }} 
+                              interval={0}
+                              angle={-20}
+                              textAnchor="end"
+                              height={55}
+                              tickFormatter={(val) => val && val.length > 20 ? `${val.substring(0, 18)}...` : val}
+                            />
                             <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10}} />
                             <Tooltip formatter={(v: any) => `$${v.toLocaleString()}`} />
                             <Legend />

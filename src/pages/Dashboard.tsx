@@ -1580,11 +1580,21 @@ export default function Dashboard() {
                 <div className="h-64">
                   {projects.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={projects}>
+                      <BarChart data={projects} margin={{ bottom: 15 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748B'}} />
+                        <XAxis 
+                          dataKey="name" 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fill: '#64748B', fontSize: 10, fontWeight: 500 }} 
+                          interval={0}
+                          angle={-20}
+                          textAnchor="end"
+                          height={55}
+                          tickFormatter={(val) => val && val.length > 20 ? `${val.substring(0, 18)}...` : val}
+                        />
                         <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748B'}} />
-                        <RechartsTooltip cursor={{fill: '#F1F5F9'}} />
+                        <RechartsTooltip cursor={{ fill: 'rgba(241, 245, 249, 0.4)', radius: 4 }} />
                         <Legend />
                         <Bar dataKey="spent" name="Spent ($)" fill="#00D9FF" radius={[4, 4, 0, 0]} />
                         <Bar dataKey="budget" name="Allocated Budget ($)" fill="#94A3B8" radius={[4, 4, 0, 0]} />
