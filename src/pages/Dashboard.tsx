@@ -733,42 +733,28 @@ export default function Dashboard() {
   const handleDeleteSelected = async () => {
     if (selectedTickets.size === 0) return;
     
-    // Check if the current user is ADMIN1, if so, they need to supply credentials
     const authStore = JSON.parse(localStorage.getItem('auth-storage') || '{}');
     const currentRole = authStore?.state?.role;
-    console.log("handleDeleteSelected: currentRole =", currentRole, "showAdminAuthModal =", showAdminAuthModal);
     
-    if (currentRole === 'ADMIN1') {
-      if (!showAdminAuthModal) {
-        console.log("Setting showAdminAuthModal to true");
-        setShowAdminAuthModal(true);
-        return;
-      }
-    } else {
-      if (!window.confirm(`Are you sure you want to delete ${selectedTickets.size} selected ticket(s)? This action cannot be undone.`)) {
-        return;
-      }
+    if (currentRole !== 'ADMIN') {
+      toast.error("Only Admin can delete tickets");
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to permanently delete ${selectedTickets.size} selected ticket(s)? This action cannot be undone.`)) {
+      return;
     }
 
     try {
       setLoading(true);
-      const headers: any = {};
-      if (currentRole === 'ADMIN1') {
-        headers['x-admin-email'] = encodeURIComponent(adminEmail);
-        headers['x-admin-password'] = encodeURIComponent(adminPassword);
-      }
-      
-      const deletePromises = Array.from(selectedTickets).map(id => api.post(`/tickets/${id}/request-deletion`, { headers }));
+      const deletePromises = Array.from(selectedTickets).map(id => api.delete(`/tickets/${id}`));
       await Promise.all(deletePromises);
       
-      toast.success(`Successfully submitted deletion request for ${selectedTickets.size} ticket(s).`);
+      toast.success(`Successfully deleted ${selectedTickets.size} ticket(s).`);
       setSelectedTickets(new Set());
-      setShowAdminAuthModal(false);
-      setAdminEmail('');
-      setAdminPassword('');
       await fetchData();
     } catch (e: any) {
-      toast.error(e.response?.data?.detail || 'Failed to delete tickets. Please check credentials and try again.');
+      toast.error(e.response?.data?.detail || 'Failed to delete tickets.');
       setLoading(false);
     }
   };
@@ -2244,7 +2230,7 @@ export default function Dashboard() {
                 <Download className="h-4 w-4 md:mr-1" aria-hidden="true" />
                 <span className="hidden md:inline">Export</span>
               </button>
-              {(role === 'ADMIN1' || role === 'SUPER_ADMIN' || role === 'ADMIN') && selectedTickets.size > 0 && (
+              {role === 'ADMIN' && selectedTickets.size > 0 && (
                 <button
                   type="button"
                   onClick={handleDeleteSelected}

@@ -663,6 +663,10 @@ export default function Settings() {
   };
 
   const handleDeleteBypass = async (id: string) => {
+    if (role !== 'ADMIN') {
+      toast.error('Only Admin can remove passports from the bypass list');
+      return;
+    }
     if (!window.confirm('Are you sure you want to remove this passport from the bypass list?')) return;
     try {
       await api.delete(`/bypass-passports/${id}`);
@@ -691,6 +695,10 @@ export default function Settings() {
   };
 
   const handleDeleteOption = async (id: string) => {
+    if (role !== 'ADMIN') {
+      toast.error('Only Admin can delete options');
+      return;
+    }
     if (!window.confirm('Are you sure you want to delete this option?')) return;
     try {
       await api.delete(`/options/${id}`);
@@ -702,6 +710,10 @@ export default function Settings() {
   };
 
   const handleResetData = async () => {
+    if (role !== 'ADMIN') {
+      toast.error('Only Admin can reset data');
+      return;
+    }
     if (!window.confirm('Are you absolutely sure you want to clear all testing data? This cannot be undone.')) return;
     try {
       await api.delete('/admin/reset-data');
@@ -738,19 +750,15 @@ export default function Settings() {
   };
 
   const handleDeleteUser = async (id: string) => {
+    if (role !== 'ADMIN') {
+      toast.error("Only Admin can delete/deactivate users");
+      return;
+    }
     if (id === currentUser?.id) {
       toast.error("You cannot delete your own account");
       return;
     }
     if (!window.confirm('Are you sure you want to deactivate this user?')) return;
-
-    if (role === 'ADMIN1') {
-      setAdminEmail('');
-      setAdminPassword('');
-      setPendingUserAction({ type: 'delete', payload: id });
-      setIsAdminAuthModalOpen(true);
-      return;
-    }
 
     try {
       await api.delete(`/users/${id}`);
@@ -819,6 +827,10 @@ export default function Settings() {
   };
 
   const handleDeleteProject = async (id: string) => {
+    if (role !== 'ADMIN') {
+      toast.error('Only Admin can delete projects');
+      return;
+    }
     if (!window.confirm('Are you sure you want to delete this project?')) return;
     try {
       await api.delete(`/projects/${id}`);
@@ -1063,13 +1075,15 @@ export default function Settings() {
                 </div>
               </form>
               
-              <div className="border-t pt-4 mt-6">
-                <h2 className="text-lg font-semibold text-red-600 mb-2">Danger Zone</h2>
-                <p className="text-sm text-slate-600 mb-4">Reset all system data (testing purpose).</p>
-                <button onClick={handleResetData} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg">
-                  Clear Database (Reset)
-                </button>
-              </div>
+              {role === 'ADMIN' && (
+                <div className="border-t pt-4 mt-6">
+                  <h2 className="text-lg font-semibold text-red-600 mb-2">Danger Zone</h2>
+                  <p className="text-sm text-slate-600 mb-4">Reset all system data (testing purpose).</p>
+                  <button onClick={handleResetData} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg">
+                    Clear Database (Reset)
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1109,9 +1123,11 @@ export default function Settings() {
                                 <button onClick={() => setEditingOption({id: opt.id, value: opt.value})} className="text-slate-400 hover:text-sky-600 p-1.5 rounded transition-colors" title="Edit">
                                   <span className="text-xs font-semibold">EDIT</span>
                                 </button>
-                                <button onClick={() => handleDeleteOption(opt.id)} className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded transition-colors" title="Delete">
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
+                                {role === 'ADMIN' && (
+                                  <button onClick={() => handleDeleteOption(opt.id)} className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded transition-colors" title="Delete">
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                )}
                               </div>
                             </>
                           )}
@@ -1214,7 +1230,7 @@ export default function Settings() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{u.email}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{u.role}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            {u.id !== currentUser?.id && (
+                            {role === 'ADMIN' && u.id !== currentUser?.id && (
                               <button onClick={() => handleDeleteUser(u.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded transition-colors" title="Deactivate">
                                 <Trash2 className="h-4 w-4 inline" />
                               </button>
@@ -1399,9 +1415,11 @@ export default function Settings() {
                               >
                                 <Edit2 className="h-4 w-4 inline" />
                               </button>
-                              <button onClick={() => handleDeleteProject(p.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded transition-colors" title="Delete">
-                                <Trash2 className="h-4 w-4 inline" />
-                              </button>
+                              {role === 'ADMIN' && (
+                                <button onClick={() => handleDeleteProject(p.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded transition-colors" title="Delete">
+                                  <Trash2 className="h-4 w-4 inline" />
+                                </button>
+                              )}
                             </td>
                           </tr>
                         );
@@ -1659,9 +1677,11 @@ export default function Settings() {
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-mono font-bold text-slate-900">{bp.pp_number}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{bp.name}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                              <button onClick={() => handleDeleteBypass(bp.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded transition-colors" title="Remove bypass">
-                                <Trash2 className="h-4 w-4 inline" />
-                              </button>
+                              {role === 'ADMIN' && (
+                                <button onClick={() => handleDeleteBypass(bp.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded transition-colors" title="Remove bypass">
+                                  <Trash2 className="h-4 w-4 inline" />
+                                </button>
+                              )}
                             </td>
                           </tr>
                         ))}

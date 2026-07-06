@@ -1327,43 +1327,8 @@ app.put("/api/tickets/:id", authenticateToken, async (req: any, res: any) => {
 });
 
 app.delete("/api/tickets/:id", authenticateToken, async (req: any, res: any) => {
-  if (req.user.role !== 'ADMIN' && req.user.role !== 'ADMIN1') {
-    return res.status(403).json({ detail: "Only Admin or Admin 1 can delete tickets." });
-  }
-
-  // Admin 1 must supply valid admin credentials to authorize deletion
-  if (req.user.role === 'ADMIN1') {
-    const admin_email_header = req.headers['x-admin-email'];
-    const admin_password_header = req.headers['x-admin-password'];
-    
-    const admin_email_raw = admin_email_header ? decodeURIComponent(admin_email_header) : (req.body?.admin_email || "");
-    const admin_password_raw = admin_password_header ? decodeURIComponent(admin_password_header) : (req.body?.admin_password || "");
-
-    const admin_email = (admin_email_raw || "").trim();
-    const admin_password = (admin_password_raw || "").trim();
-
-    if (!admin_email || !admin_password) {
-      return res.status(400).json({ detail: "Admin credentials (email and password) are required for Admin 1 to authorize deletion." });
-    }
-    try {
-      const emailLower = admin_email.toLowerCase();
-      const adminUserSnap = await fdb.collection('users').where('email', '==', emailLower).limit(1).get();
-      if (adminUserSnap.empty) {
-        return res.status(401).json({ detail: "Invalid Admin credentials. User not found with this email." });
-      }
-      const adminUserData = adminUserSnap.docs[0].data();
-      if (adminUserData.role !== 'ADMIN') {
-        return res.status(403).json({ detail: "Unauthorized: The provided credentials do not belong to a Master Admin." });
-      }
-      // Since passwords might be bcrypt-hashed, we check using bcrypt
-      const isMatch = bcrypt.compareSync(admin_password, adminUserData.password_hash);
-      if (!isMatch) {
-         return res.status(401).json({ detail: "Invalid Admin password." });
-      }
-    } catch (authErr: any) {
-      console.error("Authorization check failed:", authErr);
-      return res.status(500).json({ detail: "Internal authorization check failed." });
-    }
+  if (req.user.role !== 'ADMIN') {
+    return res.status(403).json({ detail: "Only Admin can delete tickets." });
   }
 
   const { id } = req.params;
@@ -1419,8 +1384,8 @@ app.post("/api/tickets/:id/request-deletion", authenticateToken, async (req: any
 });
 
 app.get("/api/deletion-requests", authenticateToken, async (req: any, res: any) => {
-  if (req.user.role !== 'ADMIN' && req.user.role !== 'ADMIN1') {
-    return res.status(403).json({ detail: "Only Admin or Admin 1 can view deletion requests." });
+  if (req.user.role !== 'ADMIN') {
+    return res.status(403).json({ detail: "Only Admin can view deletion requests." });
   }
 
   try {
@@ -1681,8 +1646,8 @@ app.put("/api/tasks/:taskId", authenticateToken, async (req: any, res: any) => {
 });
 
 app.delete("/api/admin/reset-data", authenticateToken, async (req: any, res: any) => {
-  if (req.user.role !== 'ADMIN1' && req.user.role !== 'ADMIN') {
-    return res.status(403).json({ detail: "Unauthorized." });
+  if (req.user.role !== 'ADMIN') {
+    return res.status(403).json({ detail: "Unauthorized. Only Admin can reset data." });
   }
 
   try {
@@ -2466,39 +2431,8 @@ app.post("/api/users", authenticateToken, async (req: any, res: any) => {
 });
 
 app.delete("/api/users/:id", authenticateToken, async (req: any, res: any) => {
-  if (req.user.role === 'ADMIN1') {
-    const admin_email_header = req.headers['x-admin-email'];
-    const admin_password_header = req.headers['x-admin-password'];
-    
-    const admin_email_raw = admin_email_header ? decodeURIComponent(admin_email_header) : (req.body?.admin_email || "");
-    const admin_password_raw = admin_password_header ? decodeURIComponent(admin_password_header) : (req.body?.admin_password || "");
-
-    const admin_email = (admin_email_raw || "").trim();
-    const admin_password = (admin_password_raw || "").trim();
-
-    if (!admin_email || !admin_password) {
-      return res.status(400).json({ detail: "Admin credentials (email and password) are required for Admin 1 to authorize user deactivation." });
-    }
-    try {
-      const emailLower = admin_email.toLowerCase();
-      const adminUserSnap = await fdb.collection('users').where('email', '==', emailLower).limit(1).get();
-      if (adminUserSnap.empty) {
-        return res.status(401).json({ detail: "Invalid Admin credentials. User not found with this email." });
-      }
-      const adminUserData = adminUserSnap.docs[0].data();
-      if (adminUserData.role !== 'ADMIN') {
-        return res.status(403).json({ detail: "Unauthorized: The provided credentials do not belong to a Master Admin." });
-      }
-      const isMatch = bcrypt.compareSync(admin_password, adminUserData.password_hash);
-      if (!isMatch) {
-         return res.status(401).json({ detail: "Invalid Admin password." });
-      }
-    } catch (authErr: any) {
-      console.error("Authorization check failed:", authErr);
-      return res.status(500).json({ detail: "Internal authorization check failed." });
-    }
-  } else if (req.user.role !== 'ADMIN') {
-    return res.status(403).json({ detail: "Admin only" });
+  if (req.user.role !== 'ADMIN') {
+    return res.status(403).json({ detail: "Only Admin can delete/deactivate users." });
   }
 
   try {
@@ -2632,6 +2566,9 @@ app.put("/api/options/:id", authenticateToken, async (req: any, res: any) => {
 });
 
 app.delete("/api/options/:id", authenticateToken, async (req: any, res: any) => {
+  if (req.user.role !== 'ADMIN') {
+    return res.status(403).json({ detail: "Only Admin can delete options." });
+  }
   try {
     await fdb.collection('options').doc(req.params.id).delete();
     res.json({ status: "deleted" });
@@ -2719,6 +2656,9 @@ app.put("/api/projects/:id", authenticateToken, async (req: any, res: any) => {
 });
 
 app.delete("/api/projects/:id", authenticateToken, async (req: any, res: any) => {
+  if (req.user.role !== 'ADMIN') {
+    return res.status(403).json({ detail: "Only Admin can delete projects." });
+  }
   try {
     await fdb.collection('projects').doc(req.params.id).delete();
     invalidateCache();
@@ -2786,8 +2726,8 @@ app.post("/api/bypass-passports", authenticateToken, async (req: any, res: any) 
 });
 
 app.delete("/api/bypass-passports/:id", authenticateToken, async (req: any, res: any) => {
-  if (req.user.role !== 'ADMIN' && req.user.role !== 'ADMIN1') {
-    return res.status(403).json({ detail: "Only Admin or Admin 1 can modify bypass list" });
+  if (req.user.role !== 'ADMIN') {
+    return res.status(403).json({ detail: "Only Admin can modify bypass list" });
   }
   try {
     const id = req.params.id.trim().toUpperCase();

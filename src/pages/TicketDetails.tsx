@@ -181,15 +181,11 @@ export default function TicketDetails() {
 
   const handleDeleteTicket = async () => {
     console.log("handleDeleteTicket: role =", role);
-    if (!window.confirm("Are you sure you want to permanently delete this entire ticket record? This action cannot be undone.")) {
+    if (role !== 'ADMIN') {
+      toast.error("Only Admin can delete ticket records");
       return;
     }
-
-    if (role === 'ADMIN1') {
-      console.log("Setting isAdminAuthModalOpen to true");
-      setAdminEmail('');
-      setAdminPassword('');
-      setIsAdminAuthModalOpen(true);
+    if (!window.confirm("Are you sure you want to permanently delete this entire ticket record? This action cannot be undone.")) {
       return;
     }
 
@@ -507,7 +503,7 @@ export default function TicketDetails() {
               {ticketData.status}
             </span>
           </div>
-          {['ADMIN', 'ADMIN1'].includes(role) && !isLocked && (
+          {role === 'ADMIN' && !isLocked && (
             <button
               id="btn-delete-ticket"
               type="button"
