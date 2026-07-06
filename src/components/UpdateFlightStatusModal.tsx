@@ -5,6 +5,7 @@ import api from '../api';
 import { format } from 'date-fns';
 import { useFormValidation } from '../hooks/useFormValidation';
 import FieldError from './FieldError';
+import ConfirmationModal from './ConfirmationModal';
 
 interface UpdateFlightStatusModalProps {
   ticket: any;
@@ -15,6 +16,21 @@ interface UpdateFlightStatusModalProps {
 
 export default function UpdateFlightStatusModal({ ticket, isOpen, onClose, onSuccess }: UpdateFlightStatusModalProps) {
   const [loading, setLoading] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+
+  const handleConfirmSubmit = async () => {
+    setLoading(true);
+    try {
+      await api.put(`/tickets/${ticket.id}/stage2`, formData);
+      toast.success('Flight status updated successfully');
+      onSuccess();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || err.response?.data?.error || 'Failed to update status');
+    } finally {
+      setLoading(false);
+      setIsConfirmOpen(false);
+    }
+  };
   const [agents, setAgents] = useState<any[]>([]);
   const { errors, handleBlur, handleChange: handleValidationChange, validateForm } = useFormValidation();
 
@@ -139,9 +155,6 @@ export default function UpdateFlightStatusModal({ ticket, isOpen, onClose, onSuc
     e.preventDefault();
     if (!validateForm(e.target as HTMLFormElement)) return;
 
-    // 2nd attempt invoice number is no longer mandatory as requested by user
-
-
     if (formData.rescheduled_departure_date && formData.departure_date && formData.rescheduled_departure_date < formData.departure_date) {
       toast.error('Rescheduled Departure Date cannot be before original Departure Date');
       return;
@@ -151,17 +164,8 @@ export default function UpdateFlightStatusModal({ ticket, isOpen, onClose, onSuc
       toast.error('Rescheduled Arrival Date cannot be before Rescheduled Departure Date');
       return;
     }
-
-    setLoading(true);
-    try {
-      await api.put(`/tickets/${ticket.id}/stage2`, formData);
-      toast.success('Flight status updated successfully');
-      onSuccess();
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail || err.response?.data?.error || 'Failed to update status');
-    } finally {
-      setLoading(false);
-    }
+    
+    setIsConfirmOpen(true);
   };
 
   return (
@@ -399,6 +403,13 @@ export default function UpdateFlightStatusModal({ ticket, isOpen, onClose, onSuc
           </div>
         </form>
       </div>
+      <ConfirmationModal
+        isOpen={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        onConfirm={handleConfirmSubmit}
+        title="Update Status"
+        message="Are you sure you want to update this ticket's status?"
+      />
     </div>
   );
 }

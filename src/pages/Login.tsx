@@ -58,8 +58,8 @@ export default function Login() {
           <div className="text-center leading-none">
             <h1 className="text-2xl font-black text-[#111111] tracking-tight font-display">Sanken</h1>
             <p className="text-[10px] font-bold text-slate-500 tracking-[0.25em] uppercase mt-1.5 font-sans">Overseas</p>
-            <div className="inline-flex mt-2.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase bg-sky-50 border border-sky-150 text-sky-700 tracking-wider">
-              SKOA Air Portal
+            <div className="inline-flex mt-2.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase bg-sky-50 border border-sky-200 text-sky-700 tracking-wider">
+              SKOA AIR PORTAL
             </div>
           </div>
         </div>

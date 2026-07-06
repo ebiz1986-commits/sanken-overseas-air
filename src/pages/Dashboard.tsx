@@ -3,12 +3,13 @@ import api from '../api';
 import toast from 'react-hot-toast';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import { useAuthStore } from '../store';
-import { LogOut, Plus, Search, Download, AlertCircle, AlertTriangle, X, Upload, Image, Eye, Trash2, LayoutGrid, List, FileText, File, ExternalLink, ChevronDown, ChevronUp, Users, Award, TrendingUp, SlidersHorizontal } from 'lucide-react';
+import { LogOut, Plus, Search, Download, AlertCircle, AlertTriangle, X, Upload, Image, Eye, Trash2, LayoutGrid, List, FileText, File, ExternalLink, ChevronDown, ChevronUp, Users, Award, TrendingUp, SlidersHorizontal, RefreshCw } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import NewTicketModal from '../components/NewTicketModal';
 import UpdateFlightStatusModal from '../components/UpdateFlightStatusModal';
+import ConfirmationModal from '../components/ConfirmationModal';
 import PoStatusDashboard from '../components/PoStatusDashboard';
 
 export const isPdfUrl = (url: string | null): boolean => {
@@ -184,70 +185,94 @@ export const TicketProgressBar = ({ ticket }: { ticket: any }) => {
 };
 
 export const renderStatusBadge = (status: string) => {
-  switch (status) {
-    case 'COMPLETED':
-      return (
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-250 shadow-3xs">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span>Completed</span>
+  const badgeConfig: Record<string, { classes: string; label: string; tooltip: string; pulse?: boolean }> = {
+    'COMPLETED': { 
+        classes: "bg-emerald-50 text-emerald-700 border-emerald-250",
+        label: "Completed",
+        tooltip: "Ticket processing is fully completed.",
+        pulse: true
+    },
+    'DRAFT': { 
+        classes: "bg-slate-100 text-slate-650 border-slate-200",
+        label: "Draft",
+        tooltip: "Ticket is currently a draft."
+    },
+    'IN_PROGRESS': { 
+        classes: "bg-blue-50 text-blue-700 border-blue-200",
+        label: "In Progress",
+        tooltip: "Ticket is currently being processed."
+    }
+  };
+
+  const config = badgeConfig[status] || {
+      classes: "bg-blue-50 text-blue-700 border-blue-200",
+      label: "In Progress",
+      tooltip: "Ticket is currently being processed."
+  };
+
+  return (
+    <div className="relative group inline-block">
+        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border shadow-3xs transition-all duration-200 hover:scale-105 hover:shadow-sm ${config.classes}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${config.pulse ? 'bg-emerald-500 animate-pulse' : 'bg-current'}`} />
+          <span>{config.label}</span>
         </span>
-      );
-    case 'DRAFT':
-      return (
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-650 border border-slate-200 shadow-3xs">
-          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-          <span>Draft</span>
+        <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-slate-900 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+            {config.tooltip}
         </span>
-      );
-    default:
-      return (
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-3xs">
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-          <span>In Progress</span>
-        </span>
-      );
-  }
+    </div>
+  );
 };
 
 export const renderFlightStatusBadge = (flight_status: string | null, departure_date?: string) => {
   const status = flight_status || 'PENDING';
+  let classes = "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border leading-none select-none shadow-3xs transition-all duration-200 hover:scale-105 hover:shadow-sm";
+  let label = status;
+  let tooltip = `Flight status: ${status}`;
+  let extra = null;
+
   if (status === 'PENDING') {
     if (departure_date && departure_date < format(new Date(), 'yyyy-MM-dd')) {
-      return (
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-650 border border-rose-200 shadow-3xs leading-none select-none">
-          <AlertCircle className="w-3.5 h-3.5 mr-1 text-rose-500" /> Update Required
-        </span>
-      );
+        classes += " bg-rose-50 text-rose-650 border-rose-200";
+        label = "Update Required";
+        tooltip = "Flight update is required as departure date has passed.";
+        extra = <AlertCircle className="w-3.5 h-3.5 mr-1 text-rose-500" />;
+    } else {
+        classes += " bg-slate-50 text-slate-500 border-slate-200/60";
+        label = "Pending";
+        tooltip = "Flight status is currently pending.";
     }
-    return (
-      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-50 text-slate-500 border border-slate-200/60 leading-none select-none">
-        Pending
-      </span>
-    );
   } else if (status === 'NO_SHOW') {
-    return (
-      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border border-red-250 bg-red-50 text-red-700 leading-none select-none shadow-3xs">
+    classes += " border-red-250 bg-red-50 text-red-700";
+    label = "No Show";
+    tooltip = "Passenger did not show for the flight.";
+    extra = (
         <span className="relative flex h-1.5 w-1.5 mr-1 shrink-0">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
           <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-600"></span>
         </span>
-        No Show
-      </span>
     );
   } else if (status === 'DEPARTED') {
-    return (
-      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border border-emerald-250 bg-emerald-50 text-emerald-700 leading-none select-none shadow-3xs">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse" />
-        Departed
-      </span>
-    );
+    classes += " border-emerald-250 bg-emerald-50 text-emerald-700";
+    label = "Departed";
+    tooltip = "Flight has departed.";
+    extra = <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse" />;
   } else {
-    return (
-      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border border-sky-250 bg-sky-50 text-sky-700 leading-none select-none shadow-3xs capitalize">
-        {status.toLowerCase()}
-      </span>
-    );
+    classes += " border-sky-250 bg-sky-50 text-sky-700";
+    label = status.toLowerCase();
+    tooltip = `Flight status: ${status.toLowerCase()}`;
   }
+
+  return (
+    <div className="relative group inline-block">
+        <span className={classes}>
+            {extra}
+            {label}
+        </span>
+        <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-slate-900 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+            {tooltip}
+        </span>
+    </div>
+  );
 };
 
 const isInvoicePending = (t: any) => {
@@ -742,6 +767,11 @@ export default function Dashboard() {
     }
   };
 
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [ticketToDelete, setTicketToDelete] = useState<Set<string> | null>(null);
+
+  // ... (existing state)
+
   const handleDeleteSelected = async () => {
     if (selectedTickets.size === 0) return;
     
@@ -753,21 +783,26 @@ export default function Dashboard() {
       return;
     }
 
-    if (!window.confirm(`Are you sure you want to permanently delete ${selectedTickets.size} selected ticket(s)? This action cannot be undone.`)) {
-      return;
-    }
+    setTicketToDelete(selectedTickets);
+    setIsDeleteModalOpen(true);
+  };
 
+  const confirmDelete = async () => {
+    if (!ticketToDelete) return;
     try {
       setLoading(true);
-      const deletePromises = Array.from(selectedTickets).map(id => api.delete(`/tickets/${id}`));
+      const deletePromises = Array.from(ticketToDelete).map(id => api.delete(`/tickets/${id}`));
       await Promise.all(deletePromises);
       
-      toast.success(`Successfully deleted ${selectedTickets.size} ticket(s).`);
+      toast.success(`Successfully deleted ${ticketToDelete.size} ticket(s).`);
       setSelectedTickets(new Set());
       await fetchData();
     } catch (e: any) {
       toast.error(e.response?.data?.detail || 'Failed to delete tickets.');
       setLoading(false);
+    } finally {
+      setLoading(false);
+      setTicketToDelete(null);
     }
   };
 
@@ -1270,7 +1305,8 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-12">
       <main className="max-w-[200rem] mx-auto px-4 sm:px-6 lg:px-8 py-8" id="main-content">
-        <div className="flex justify-end mb-4">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
           <button 
             onClick={() => { fetchData(); fetchProjects(); }}
             type="button"
@@ -1281,222 +1317,116 @@ export default function Dashboard() {
           </button>
         </div>
 
-        {/* Dashboard Operational Intelligence Hub (Compact Animated Row) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 mb-4">
+        {/* Dashboard Operational Intelligence Hub */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           
-          {/* Column 1: Workflow Status Tracker (col-span-1 lg:col-span-4) */}
+          {/* Column 1: Workflow Status Tracker */}
           <motion.div 
             initial={{ opacity: 0, y: 15 }} 
             animate={{ opacity: 1, y: 0 }} 
             transition={{ duration: 0.4 }}
-            className="lg:col-span-4 bg-white rounded-xl shadow-xs border border-slate-200 p-2.5 flex flex-col justify-between h-full min-h-[125px]"
+            className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col h-full min-h-[220px]"
           >
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-[10.5px] font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>
-                  Workflow Status
-                </h3>
-                <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-widest bg-slate-50 border border-slate-100 px-1 py-0.2 rounded">
-                  Live
-                </span>
-              </div>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                {Object.entries(dashboardTopSummary.statusCounts).map(([status, count]) => {
-                  const label = status.replace(/_/g, ' ');
-                  const isCompleted = status === 'COMPLETED';
-                  const isProgress = status === 'IN_PROGRESS';
-                  
-                  return (
-                    <motion.div
-                      key={status}
-                      whileHover={{ scale: 1.01, y: -0.5 }}
-                      className="flex items-center justify-between bg-slate-50/60 border border-slate-200/60 hover:border-sky-300 p-1.5 rounded-lg transition-all text-left cursor-pointer"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block truncate" title={label}>
-                          {label}
-                        </span>
-                        <span className="text-base font-black text-slate-800 mt-0.5 block leading-none">
-                          {count as React.ReactNode}
-                        </span>
-                      </div>
-                      <div className={`w-1 h-4 rounded-full shrink-0 ml-1.5 ${isCompleted ? 'bg-emerald-500' : isProgress ? 'bg-amber-500' : 'bg-slate-300'}`}></div>
-                    </motion.div>
-                  );
-                })}
-                {Object.keys(dashboardTopSummary.statusCounts).length === 0 && (
-                  <div className="text-[10.5px] text-slate-400 font-medium col-span-2 py-3 text-center">No active statuses.</div>
-                )}
-              </div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-[12px] font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>
+                Workflow Status
+              </h3>
+              <span className="text-[10px] font-semibold text-emerald-600 uppercase tracking-widest bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
+                Live
+              </span>
             </div>
             
-            <div className="border-t border-slate-100 pt-1.5 mt-2 text-[9px] text-slate-400 flex items-center gap-1">
-              <span className="inline-block w-1 h-1 rounded-full bg-slate-450"></span>
-              Real-time synchronization across pipeline stages
+            <div className="grid grid-cols-2 gap-2 flex-1">
+              {Object.entries(dashboardTopSummary.statusCounts).map(([status, count]) => {
+                const label = status.replace(/_/g, ' ');
+                const isCompleted = status === 'COMPLETED';
+                const isProgress = status === 'IN_PROGRESS';
+                
+                return (
+                  <motion.div
+                    key={status}
+                    whileHover={{ scale: 1.02 }}
+                    className="flex flex-col justify-center bg-slate-50/60 border border-slate-200/60 hover:border-sky-300 p-3 rounded-xl transition-all text-left cursor-pointer"
+                  >
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1" title={label}>
+                      {label}
+                    </span>
+                    <span className="text-2xl font-black text-slate-800 leading-none">
+                      {count as React.ReactNode}
+                    </span>
+                  </motion.div>
+                );
+              })}
+            </div>
+            <div className="border-t border-slate-100 pt-3 mt-4 text-[10px] text-slate-400 flex items-center gap-2">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+              Real-time sync across pipeline stages
             </div>
           </motion.div>
 
-          {/* Column 2: Ticketing Agent Leaderboard (col-span-1 lg:col-span-4) */}
+          {/* Column 2: Ticketing Agents */}
           <motion.div 
             initial={{ opacity: 0, y: 15 }} 
             animate={{ opacity: 1, y: 0 }} 
             transition={{ duration: 0.4, delay: 0.1 }}
-            className="lg:col-span-4 bg-white rounded-xl shadow-xs border border-slate-200 p-2.5 flex flex-col justify-between h-full min-h-[125px]"
+            className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col h-full min-h-[220px]"
           >
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-[10.5px] font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1">
-                  <Award className="w-3.5 h-3.5 text-emerald-500" />
-                  Ticketing Agent Volume & Costs
-                </h3>
-                <span className="text-[9px] font-semibold text-emerald-600 uppercase tracking-widest bg-emerald-50 border border-emerald-100 px-1 py-0.2 rounded">
-                  Leaderboard
-                </span>
-              </div>
-              
-              <div className="space-y-1 max-h-[85px] overflow-y-auto pr-1">
-                {agentAccumulatedStats.map(({ agent, count, cost }, idx) => (
-                  <motion.div 
-                    key={agent} 
-                    initial={{ opacity: 0, x: -5 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: idx * 0.05 }}
-                    whileHover={{ scale: 1.02, y: -1 }}
-                    className="flex items-center justify-between bg-slate-50/60 hover:bg-emerald-50 border border-slate-100 hover:border-emerald-200 p-1 rounded-lg transition-all hover:shadow-sm"
-                  >
-                    <div className="flex items-center space-x-1 min-w-0">
-                      <div className="p-0.5 bg-emerald-50 text-emerald-600 rounded shrink-0">
-                        <Users className="w-3 h-3" />
-                      </div>
-                      <span className="text-[10.5px] font-bold text-slate-700 uppercase tracking-wider truncate max-w-[120px]" title={agent}>
-                        {agent}
-                      </span>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <div className="text-[10px] font-black text-slate-800 leading-none">
-                        {count} <span className="text-[8.5px] font-medium text-slate-450">Tickets</span>
-                      </div>
-                      <div className="text-[9px] font-bold text-emerald-600 mt-0.5">
-                        ${cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-                {agentAccumulatedStats.length === 0 && (
-                  <div className="text-[10.5px] text-slate-400 font-medium py-3 text-center">No agents registered.</div>
-                )}
-              </div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-[12px] font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                <Users className="w-4 h-4 text-emerald-500" />
+                Ticketing Agents
+              </h3>
             </div>
-
-            <div className="border-t border-slate-100 pt-1.5 mt-2 text-[9px] text-slate-400 flex items-center gap-1 justify-between">
-              <span>Total accumulated to present</span>
-              <span className="font-semibold text-emerald-600 bg-emerald-50/50 px-1 py-0.2 rounded border border-emerald-100/30">USD</span>
+            
+            <div className="space-y-2 flex-1 overflow-y-auto">
+              {agentAccumulatedStats.map(({ agent, count, cost }, idx) => (
+                <div 
+                  key={agent}
+                  className="flex items-center justify-between bg-slate-50 border border-slate-100 p-3 rounded-xl"
+                >
+                  <span className="text-sm font-bold text-slate-700 truncate" title={agent}>{agent}</span>
+                  <div className="text-right">
+                    <span className="text-xs font-black text-slate-900 block">{count} Tickets</span>
+                    <span className="text-[10px] font-bold text-emerald-600">${cost.toLocaleString()}</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </motion.div>
 
-          {/* Column 3: Operational Metrics 2x2 Grid (col-span-1 lg:col-span-4) */}
-          <div className="lg:col-span-4 grid grid-cols-2 gap-2 min-h-[125px]">
-            
-            {/* Card 1: Total Processed */}
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }} 
-              animate={{ opacity: 1, scale: 1 }} 
-              transition={{ duration: 0.3, delay: 0.2 }}
-              whileHover={{ y: -1, scale: 1.01 }}
-              className="bg-white rounded-xl shadow-xs border border-slate-200 p-2.5 flex flex-col justify-between relative overflow-hidden group"
+          {/* Column 3: Refresh and Metrics Overview */}
+          <div className="flex flex-col gap-6">
+            <motion.button 
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => { fetchData(); fetchProjects(); }}
+              type="button"
+              className="w-full flex items-center justify-center gap-2 text-sm border border-sky-200 font-bold text-sky-700 hover:bg-sky-50 transition-all rounded-xl px-4 py-3 shadow-sm bg-sky-50/50"
             >
-              <div className="absolute top-0 right-0 -mr-2 -mt-2 w-8 h-8 bg-emerald-50/35 rounded-full group-hover:scale-110 transition-transform pointer-events-none"></div>
-              <div className="flex items-center justify-between mb-0.5">
-                <span className="text-[9px] font-extrabold text-slate-450 uppercase tracking-wider block">Processed</span>
-                <File className="w-3 h-3 text-emerald-500" />
-              </div>
-              <div>
-                <span className="text-lg font-black text-slate-900 leading-none block">
-                  {dashboardTopSummary.totalTicketsCount}
-                </span>
-                <span className="text-[8.5px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5 block">
-                  Since {dashboardTopSummary.updatingSince}
-                </span>
-              </div>
-            </motion.div>
+              <RefreshCw className="w-4 h-4" />
+              Refresh Dashboard Data
+            </motion.button>
 
-            {/* Card 2: Active Invoices */}
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }} 
-              animate={{ opacity: 1, scale: 1 }} 
-              transition={{ duration: 0.3, delay: 0.25 }}
-              whileHover={{ y: -1, scale: 1.01 }}
-              className="bg-white rounded-xl shadow-xs border border-slate-200 p-2.5 flex flex-col justify-between relative overflow-hidden group"
-            >
-              <div className="absolute top-0 right-0 -mr-2 -mt-2 w-8 h-8 bg-indigo-50/35 rounded-full group-hover:scale-110 transition-transform pointer-events-none"></div>
-              <div className="flex items-center justify-between mb-0.5">
-                <span className="text-[9px] font-extrabold text-slate-450 uppercase tracking-wider block">Invoices</span>
-                <FileText className="w-3 h-3 text-indigo-500" />
+            {/* Quick Metrics */}
+            <div className="grid grid-cols-2 gap-3 flex-1">
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3 flex flex-col justify-center">
+                <span className="text-[9px] font-extrabold text-slate-450 uppercase tracking-wider mb-1">Processed</span>
+                <span className="text-xl font-black text-slate-900 leading-none">{dashboardTopSummary.totalTicketsCount}</span>
               </div>
-              <div>
-                <span className="text-lg font-black text-slate-900 leading-none block">
-                  {dashboardTopSummary.activeInvoicesCount}
-                </span>
-                <span className="text-[8px] text-indigo-650 bg-indigo-50 px-1 py-0.2 rounded font-bold inline-block mt-0.5">
-                  {dashboardTopSummary.allInvoicesCount} overall
-                </span>
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3 flex flex-col justify-center">
+                <span className="text-[9px] font-extrabold text-slate-450 uppercase tracking-wider mb-1">Invoices</span>
+                <span className="text-xl font-black text-slate-900 leading-none">{dashboardTopSummary.activeInvoicesCount}</span>
               </div>
-            </motion.div>
-
-            {/* Card 3: Total Passengers */}
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }} 
-              animate={{ opacity: 1, scale: 1 }} 
-              transition={{ duration: 0.3, delay: 0.3 }}
-              whileHover={{ y: -1, scale: 1.01 }}
-              className="bg-white rounded-xl shadow-xs border border-slate-200 p-2.5 flex flex-col justify-between relative overflow-hidden group"
-            >
-              <div className="absolute top-0 right-0 -mr-2 -mt-2 w-8 h-8 bg-sky-50/35 rounded-full group-hover:scale-110 transition-transform pointer-events-none"></div>
-              <div className="flex items-center justify-between mb-0.5">
-                <span className="text-[9px] font-extrabold text-slate-450 uppercase tracking-wider block">Passengers</span>
-                <Users className="w-3 h-3 text-sky-500" />
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3 flex flex-col justify-center">
+                <span className="text-[9px] font-extrabold text-slate-450 uppercase tracking-wider mb-1">Passengers</span>
+                <span className="text-xl font-black text-slate-900 leading-none">{dashboardTopSummary.passengersCount}</span>
               </div>
-              <div>
-                <span className="text-lg font-black text-slate-900 leading-none block">
-                  {dashboardTopSummary.passengersCount}
-                </span>
-                <span className="text-[8.5px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5 block">
-                  Unique Travelers
-                </span>
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3 flex flex-col justify-center">
+                <span className="text-[9px] font-extrabold text-slate-450 uppercase tracking-wider mb-1">No Shows</span>
+                <span className="text-xl font-black text-slate-900 leading-none">{dashboardTopSummary.noShowCount}</span>
               </div>
-            </motion.div>
-
-            {/* Card 4: No Show Flights */}
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }} 
-              animate={{ opacity: 1, scale: 1 }} 
-              transition={{ duration: 0.3, delay: 0.35 }}
-              whileHover={{ y: -1, scale: 1.01 }}
-              className={`rounded-xl shadow-xs border p-2.5 flex flex-col justify-between relative overflow-hidden group transition-all duration-300 ${
-                dashboardTopSummary.noShowCount > 0 
-                  ? 'border-rose-300 bg-rose-50/30' 
-                  : 'border-slate-200 bg-white'
-              }`}
-            >
-              <div className={`absolute top-0 right-0 -mr-2 -mt-2 w-8 h-8 rounded-full group-hover:scale-110 transition-transform pointer-events-none ${
-                dashboardTopSummary.noShowCount > 0 ? 'bg-rose-100/35' : 'bg-slate-50/35'
-              }`}></div>
-              <div className="flex items-center justify-between mb-0.5">
-                <span className="text-[9px] font-extrabold text-slate-450 uppercase tracking-wider block">No Shows</span>
-                <AlertTriangle className={`w-3 h-3 ${dashboardTopSummary.noShowCount > 0 ? 'text-rose-500' : 'text-slate-400'}`} />
-              </div>
-              <div>
-                <span className={`text-lg font-black leading-none block ${dashboardTopSummary.noShowCount > 0 ? 'text-rose-650' : 'text-slate-900'}`}>
-                  {dashboardTopSummary.noShowCount}
-                </span>
-                <span className={`text-[8.5px] font-bold block mt-0.5 ${dashboardTopSummary.noShowCount > 0 ? 'text-rose-600' : 'text-slate-405 uppercase tracking-wider'}`}>
-                  {dashboardTopSummary.noShowCount > 0 ? 'Immediate Action' : 'No exceptions'}
-                </span>
-              </div>
-            </motion.div>
-
+            </div>
           </div>
 
         </div>
@@ -1585,39 +1515,31 @@ export default function Dashboard() {
           <>
             {/* KPI Cards */}
             {metrics && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
-                <div className="bg-white rounded-xl shadow border border-slate-200/60 p-6 flex flex-col items-start hover:shadow-md transition-shadow relative overflow-hidden">
-                  <div className="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 bg-slate-50 rounded-full opacity-50 pointer-events-none"></div>
-                  <span className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Total Tickets</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-5 mb-8">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col items-start hover:border-slate-300 transition-all duration-300 relative overflow-hidden">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Total Tickets</span>
                   <span className="text-4xl font-extrabold text-slate-900 mt-2 tracking-tight">{metrics.total_tickets}</span>
                 </div>
-                <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-xl shadow border border-emerald-100 p-6 flex flex-col items-start hover:shadow-md transition-shadow relative overflow-hidden">
-                  <div className="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 bg-emerald-200/30 rounded-full opacity-50 pointer-events-none"></div>
-                  <span className="text-sm font-semibold text-emerald-800 uppercase tracking-wider">Processed & Paid</span>
-                  <span className="text-4xl font-extrabold text-emerald-700 mt-2 tracking-tight">{metrics.processed_tickets}</span>
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col items-start hover:border-slate-300 transition-all duration-300 relative overflow-hidden">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Processed & Paid</span>
+                  <span className="text-4xl font-extrabold text-emerald-600 mt-2 tracking-tight">{metrics.processed_tickets}</span>
                 </div>
                 <div 
                   onClick={() => { setActiveTab('ALL_TICKETS'); setAllTicketsSubTab('MISSED'); }} 
-                  className="bg-gradient-to-br from-amber-50 to-red-50 rounded-xl shadow border border-amber-100 p-6 flex flex-col items-start hover:shadow-md cursor-pointer transition-shadow relative overflow-hidden group"
+                  className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col items-start hover:border-red-300 cursor-pointer transition-all duration-300 relative overflow-hidden group"
                   title="Click to view all missed flights"
                 >
-                  <div className="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 bg-red-200/30 rounded-full opacity-50 pointer-events-none"></div>
                   <div className="flex items-center justify-between w-full">
-                    <span className="text-sm font-semibold text-red-800 uppercase tracking-wider">No-Shows</span>
+                    <span className="text-[11px] font-bold text-red-600 uppercase tracking-widest">No-Shows</span>
                     {metrics.no_show_count > 0 && (
-                      <span className="relative flex h-3 w-3">
+                      <span className="relative flex h-2.5 w-2.5">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-600"></span>
                       </span>
                     )}
                   </div>
                   <div className="flex items-end justify-between w-full mt-2">
                     <span className="text-4xl font-extrabold text-red-600 tracking-tight">{metrics.no_show_count}</span>
-                    {metrics.no_show_count > 0 && (
-                      <span className="text-[10px] font-black tracking-wide uppercase px-2 py-0.5 rounded-full bg-red-100 text-red-750 border border-red-200 animate-pulse">
-                        Danger Zone Active
-                      </span>
-                    )}
                   </div>
                 </div>
                 <div onClick={() => {
@@ -1627,10 +1549,9 @@ export default function Dashboard() {
                     setActiveTab('ALL_TICKETS');
                     setAllTicketsSubTab('UPDATE_REQUIRED');
                   }
-                }} className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl shadow border border-orange-200 p-6 flex flex-col items-start cursor-pointer hover:shadow-md transition-shadow relative overflow-hidden">
-                  <div className="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 bg-orange-200/30 rounded-full opacity-50 pointer-events-none"></div>
-                  <span className="text-sm font-semibold text-orange-800 uppercase tracking-wider">Update Required</span>
-                  <span className="text-4xl font-extrabold text-orange-600 mt-2 tracking-tight">{updateRequiredCount || 0}</span>
+                }} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col items-start cursor-pointer hover:border-orange-300 transition-all duration-300 relative overflow-hidden">
+                  <span className="text-[11px] font-bold text-orange-600 uppercase tracking-widest">Update Required</span>
+                  <span className="text-4xl font-extrabold text-slate-900 mt-2 tracking-tight">{updateRequiredCount || 0}</span>
                 </div>
                 <div onClick={() => {
                   if (role === 'FINANCE') {
@@ -5031,6 +4952,13 @@ export default function Dashboard() {
             </div>
           </div>
       )}
+      <ConfirmationModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={confirmDelete}
+        title="Delete Tickets"
+        message={`Are you sure you want to permanently delete ${ticketToDelete?.size || 0} selected ticket(s)? This action cannot be undone.`}
+      />
     </div>
   );
 }
