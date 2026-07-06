@@ -250,6 +250,14 @@ export const renderFlightStatusBadge = (flight_status: string | null, departure_
   }
 };
 
+const isInvoicePending = (t: any) => {
+  if (!t) return false;
+  const isFirstAttemptPending = !t.first_invoice_number || !t.first_invoice_number.trim();
+  const isSecondAttemptActive = ['NO_SHOW', 'CANCELLED', 'RESCHEDULED'].includes(t.flight_status);
+  const isSecondAttemptPending = isSecondAttemptActive && (!t.other_invoice_number || !t.other_invoice_number.trim());
+  return isFirstAttemptPending || isSecondAttemptPending;
+};
+
 export default function Dashboard() {
   const { role, logout, user, token } = useAuthStore();
   const navigate = useNavigate();
@@ -308,7 +316,7 @@ export default function Dashboard() {
   const [bulkProjectPoNumbers, setBulkProjectPoNumbers] = useState<{ [invoiceNumber: string]: { [projectId: string]: string } }>({});
   const [expandedInvoices, setExpandedInvoices] = useState<{ [invoiceNumber: string]: boolean }>({});
 
-  const [allTicketsSubTab, setAllTicketsSubTab] = useState<'SUMMARY' | 'NO_ISSUE' | 'MISSED' | 'UPDATE_REQUIRED' | 'DANGER_ZONE' | 'PAYMENT_DONE'>('SUMMARY');
+  const [allTicketsSubTab, setAllTicketsSubTab] = useState<'SUMMARY' | 'NO_ISSUE' | 'MISSED' | 'UPDATE_REQUIRED' | 'DANGER_ZONE' | 'PAYMENT_DONE' | 'INVOICE_PENDING'>('SUMMARY');
   const [expandedTicketId, setExpandedTicketId] = useState<string | null>(null);
 
   const [viewMode, setViewMode] = useState<'table' | 'cards'>(
@@ -514,6 +522,10 @@ export default function Dashboard() {
     return tickets.filter(t => t.po_status !== 'payment done' && t.stage2_completed).length;
   }, [tickets]);
 
+  const invoicePendingCount = useMemo(() => {
+    return (tickets || []).filter(t => isInvoicePending(t)).length;
+  }, [tickets]);
+
   const updateRequiredCount = useMemo(() => {
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     return (tickets || []).filter(t => {
@@ -526,7 +538,7 @@ export default function Dashboard() {
         const secondFlightUpdate = ['NO_SHOW', 'RESCHEDULED', 'CANCELLED'].includes(t.flight_status) &&
                         (!t.rescheduled_flight_status || t.rescheduled_flight_status === 'PENDING') &&
                         (t.rescheduled_departure_date && t.rescheduled_departure_date < todayStr);
-        return firstFlightUpdate || secondFlightUpdate;
+        return (firstFlightUpdate || secondFlightUpdate) && !isInvoicePending(t);
       }
     }).length;
   }, [tickets, role]);
@@ -1080,11 +1092,11 @@ export default function Dashboard() {
     let matchesSubTab = true;
     if (activeTab === 'ALL_TICKETS') {
       if (allTicketsSubTab === 'NO_ISSUE') {
-        matchesSubTab = t.flight_status === 'DEPARTED';
+        matchesSubTab = t.flight_status === 'DEPARTED' && !isInvoicePending(t);
       } else if (allTicketsSubTab === 'MISSED') {
         // Appears here after the first NO_SHOW, and also after second NO_SHOW
-        matchesSubTab = t.flight_status === 'NO_SHOW' || t.rescheduled_flight_status === 'NO_SHOW' ||
-                        (['RESCHEDULED', 'CANCELLED'].includes(t.flight_status) && t.rescheduled_flight_status === 'DEPARTED');
+        matchesSubTab = (t.flight_status === 'NO_SHOW' || t.rescheduled_flight_status === 'NO_SHOW' ||
+                        (['RESCHEDULED', 'CANCELLED'].includes(t.flight_status) && t.rescheduled_flight_status === 'DEPARTED')) && !isInvoicePending(t);
       } else if (allTicketsSubTab === 'UPDATE_REQUIRED') {
         if (role === 'FINANCE') {
           matchesSubTab = t.stage2_completed && !t.stage3_completed && t.flight_status !== 'PENDING';
@@ -1094,16 +1106,18 @@ export default function Dashboard() {
           const secondFlightUpdate = ['NO_SHOW', 'RESCHEDULED', 'CANCELLED'].includes(t.flight_status) &&
                           (!t.rescheduled_flight_status || t.rescheduled_flight_status === 'PENDING') &&
                           (t.rescheduled_departure_date && t.rescheduled_departure_date < format(new Date(), 'yyyy-MM-dd'));
-          matchesSubTab = firstFlightUpdate || secondFlightUpdate;
+          matchesSubTab = (firstFlightUpdate || secondFlightUpdate) && !isInvoicePending(t);
         }
       } else if (allTicketsSubTab === 'DANGER_ZONE') {
         // Appears here only if both initial and rescheduled flight statuses are NO_SHOW (second no-show)
-        matchesSubTab = t.flight_status === 'NO_SHOW' && t.rescheduled_flight_status === 'NO_SHOW';
+        matchesSubTab = t.flight_status === 'NO_SHOW' && t.rescheduled_flight_status === 'NO_SHOW' && !isInvoicePending(t);
       } else if (allTicketsSubTab === 'PAYMENT_DONE') {
         matchesSubTab = t.po_status === 'payment done';
+      } else if (allTicketsSubTab === 'INVOICE_PENDING') {
+        matchesSubTab = isInvoicePending(t);
       } else {
         // SUMMARY (Air ticket summary sheet) contains all tickets including no-shows, rescheduled, cancelled
-        matchesSubTab = true;
+        matchesSubTab = !isInvoicePending(t);
       }
     }
     
@@ -1571,7 +1585,7 @@ export default function Dashboard() {
           <>
             {/* KPI Cards */}
             {metrics && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
                 <div className="bg-white rounded-xl shadow border border-slate-200/60 p-6 flex flex-col items-start hover:shadow-md transition-shadow relative overflow-hidden">
                   <div className="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 bg-slate-50 rounded-full opacity-50 pointer-events-none"></div>
                   <span className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Total Tickets</span>
@@ -1617,6 +1631,18 @@ export default function Dashboard() {
                   <div className="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 bg-orange-200/30 rounded-full opacity-50 pointer-events-none"></div>
                   <span className="text-sm font-semibold text-orange-800 uppercase tracking-wider">Update Required</span>
                   <span className="text-4xl font-extrabold text-orange-600 mt-2 tracking-tight">{updateRequiredCount || 0}</span>
+                </div>
+                <div onClick={() => {
+                  if (role === 'FINANCE') {
+                    setActiveTab('FINANCE_BULK_PO');
+                  } else {
+                    setActiveTab('ALL_TICKETS');
+                    setAllTicketsSubTab('INVOICE_PENDING');
+                  }
+                }} className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl shadow border border-amber-200 p-6 flex flex-col items-start cursor-pointer hover:shadow-md transition-shadow relative overflow-hidden">
+                  <div className="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 bg-amber-200/30 rounded-full opacity-50 pointer-events-none"></div>
+                  <span className="text-sm font-semibold text-amber-800 uppercase tracking-wider">Invoice Pending</span>
+                  <span className="text-4xl font-extrabold text-amber-600 mt-2 tracking-tight">{invoicePendingCount || 0}</span>
                 </div>
                 <div className="bg-gradient-to-br from-sky-50 to-sky-100/50 rounded-xl shadow border border-sky-100 p-6 flex flex-col items-start hover:shadow-md transition-shadow relative overflow-hidden">
                   <div className="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 bg-sky-200/30 rounded-full opacity-50 pointer-events-none"></div>
@@ -2119,6 +2145,15 @@ export default function Dashboard() {
               >
                 {updateRequiredCount > 0 && <span className="mr-1.5 inline-flex items-center justify-center bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.25 rounded-full">{updateRequiredCount}</span>}
                 Update Required
+              </button>
+              <button
+                type="button"
+                aria-pressed={allTicketsSubTab === 'INVOICE_PENDING'}
+                onClick={() => setAllTicketsSubTab('INVOICE_PENDING')}
+                className={`px-3 py-1 text-xs font-semibold rounded transition-colors flex items-center focus:outline-none focus:ring-1 focus:ring-amber-500 ${allTicketsSubTab === 'INVOICE_PENDING' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'text-slate-600 hover:text-slate-900'}`}
+              >
+                {invoicePendingCount > 0 && <span className="mr-1.5 inline-flex items-center justify-center bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.25 rounded-full">{invoicePendingCount}</span>}
+                Invoice Pending
               </button>
               <button
                 type="button"
@@ -2702,7 +2737,10 @@ export default function Dashboard() {
                   pagedTickets.map((t, idx) => (
                     <React.Fragment key={`${t.id}-${idx}`}>
                     <tr 
-                      className={`transition-all duration-150 border-l-4 hover:shadow-[0_2px_8px_-1px_rgba(0,0,0,0.06)] hover:bg-slate-50/95 relative ${activeTab === 'ALL_TICKETS' && (allTicketsSubTab === 'MISSED' || allTicketsSubTab === 'DANGER_ZONE') ? 'cursor-pointer bg-red-50/15 hover:bg-red-50/30 border-red-500 focus:outline-none focus:bg-red-50/25' : 'hover:bg-slate-50/80 border-transparent'}`} 
+                      className={`transition-all duration-150 border-l-4 hover:shadow-[0_2px_8px_-1px_rgba(0,0,0,0.06)] hover:bg-slate-50/95 relative ${
+                        activeTab === 'ALL_TICKETS' && allTicketsSubTab === 'INVOICE_PENDING' ? 'bg-amber-50/15 hover:bg-amber-50/25 border-amber-500' :
+                        activeTab === 'ALL_TICKETS' && (allTicketsSubTab === 'MISSED' || allTicketsSubTab === 'DANGER_ZONE') ? 'cursor-pointer bg-red-50/15 hover:bg-red-50/30 border-red-500 focus:outline-none focus:bg-red-50/25' : 'hover:bg-slate-50/80 border-transparent'
+                      }`} 
                       onClick={() => (activeTab === 'ALL_TICKETS' && (allTicketsSubTab === 'MISSED' || allTicketsSubTab === 'DANGER_ZONE')) && setExpandedTicketId(expandedTicketId === t.id ? null : t.id)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
@@ -2970,8 +3008,8 @@ export default function Dashboard() {
                                       </div>
                                     </div>
                                   ) : (
-                                    <div className="flex items-center gap-1 text-slate-400 italic text-[10px]">
-                                      <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1 rounded leading-none">2nd</span>
+                                    <div className="flex items-center gap-1 text-amber-700 font-extrabold text-[10px]">
+                                      <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1 rounded leading-none">2nd</span>
                                       Pending Invoice
                                     </div>
                                   )}
@@ -2994,7 +3032,11 @@ export default function Dashboard() {
                                       </span>
                                     )}
                                   </div>
-                                ) : '-'
+                                ) : (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200 uppercase tracking-wide leading-none">
+                                    ⚠ Pending Invoice
+                                  </span>
+                                )
                               )}
                             </td>
                           )}
@@ -3134,8 +3176,8 @@ export default function Dashboard() {
                                       </div>
                                     </div>
                                   ) : (
-                                    <div className="flex items-center gap-1 text-slate-400 italic text-[10px]">
-                                      <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1 rounded leading-none">2nd</span>
+                                    <div className="flex items-center gap-1 text-amber-700 font-extrabold text-[10px]">
+                                      <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1 rounded leading-none">2nd</span>
                                       Pending Invoice
                                     </div>
                                   )}
@@ -3158,7 +3200,11 @@ export default function Dashboard() {
                                       </span>
                                     )}
                                   </div>
-                                ) : '-'
+                                ) : (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200 uppercase tracking-wide leading-none">
+                                    ⚠ Pending Invoice
+                                  </span>
+                                )
                               )}
                             </td>
                           )}

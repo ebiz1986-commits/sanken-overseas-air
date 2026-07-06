@@ -139,12 +139,8 @@ export default function UpdateFlightStatusModal({ ticket, isOpen, onClose, onSuc
     e.preventDefault();
     if (!validateForm(e.target as HTMLFormElement)) return;
 
-    if (['NO_SHOW', 'CANCELLED', 'RESCHEDULED'].includes(formData.flight_status)) {
-      if (!formData.other_invoice_number || !formData.other_invoice_number.trim()) {
-        toast.error('Please enter the 2nd Attempt Invoice Number');
-        return;
-      }
-    }
+    // 2nd attempt invoice number is no longer mandatory as requested by user
+
 
     if (formData.rescheduled_departure_date && formData.departure_date && formData.rescheduled_departure_date < formData.departure_date) {
       toast.error('Rescheduled Departure Date cannot be before original Departure Date');
@@ -267,9 +263,8 @@ export default function UpdateFlightStatusModal({ ticket, isOpen, onClose, onSuc
                   </select>
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-bold uppercase tracking-wider mb-1" style={{ color: '#c2410c' }}>2nd Attempt Invoice Number *</label>
+                  <label className="block text-xs font-bold uppercase tracking-wider mb-1" style={{ color: '#c2410c' }}>2nd Attempt Invoice Number</label>
                   <input 
-                    required 
                     type="text" 
                     name="other_invoice_number" 
                     value={formData.other_invoice_number} 
