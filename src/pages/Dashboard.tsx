@@ -184,6 +184,8 @@ export const TicketProgressBar = ({ ticket }: { ticket: any }) => {
 };
 
 export default function Dashboard() {
+  const { role, logout, user, token } = useAuthStore();
+  const navigate = useNavigate();
   const [metrics, setMetrics] = useState<any>(null);
   const [flightStatus, setFlightStatus] = useState<any>({});
   const [projects, setProjects] = useState<any[]>([]);
@@ -412,6 +414,23 @@ export default function Dashboard() {
   const pendingPaymentUpdateCount = useMemo(() => {
     return tickets.filter(t => t.po_status !== 'payment done' && t.stage2_completed).length;
   }, [tickets]);
+
+  const updateRequiredCount = useMemo(() => {
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    return (tickets || []).filter(t => {
+      if (!t) return false;
+      if (role === 'FINANCE') {
+        return t.stage2_completed && !t.stage3_completed && t.flight_status !== 'PENDING';
+      } else {
+        const firstFlightUpdate = (!t.flight_status || t.flight_status === 'PENDING') && 
+                        (t.departure_date && t.departure_date < todayStr);
+        const secondFlightUpdate = ['NO_SHOW', 'RESCHEDULED', 'CANCELLED'].includes(t.flight_status) &&
+                        (!t.rescheduled_flight_status || t.rescheduled_flight_status === 'PENDING') &&
+                        (t.rescheduled_departure_date && t.rescheduled_departure_date < todayStr);
+        return firstFlightUpdate || secondFlightUpdate;
+      }
+    }).length;
+  }, [tickets, role]);
 
   const dashboardTopSummary = useMemo(() => {
     const activeInvoices = new Set<string>();
@@ -748,9 +767,6 @@ export default function Dashboard() {
       toast.error(e.response?.data?.detail || 'Failed to update cost allocation', { id: updatingToast });
     }
   };
-
-  const { role, logout, user, token } = useAuthStore();
-  const navigate = useNavigate();
 
   const handleLogout = () => {
     logout();
@@ -1514,7 +1530,7 @@ export default function Dashboard() {
                 }} className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl shadow border border-orange-200 p-6 flex flex-col items-start cursor-pointer hover:shadow-md transition-shadow relative overflow-hidden">
                   <div className="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 bg-orange-200/30 rounded-full opacity-50 pointer-events-none"></div>
                   <span className="text-sm font-semibold text-orange-800 uppercase tracking-wider">Update Required</span>
-                  <span className="text-4xl font-extrabold text-orange-600 mt-2 tracking-tight">{metrics.update_required_count || 0}</span>
+                  <span className="text-4xl font-extrabold text-orange-600 mt-2 tracking-tight">{updateRequiredCount || 0}</span>
                 </div>
                 <div className="bg-gradient-to-br from-sky-50 to-sky-100/50 rounded-xl shadow border border-sky-100 p-6 flex flex-col items-start hover:shadow-md transition-shadow relative overflow-hidden">
                   <div className="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 bg-sky-200/30 rounded-full opacity-50 pointer-events-none"></div>
@@ -1793,7 +1809,7 @@ export default function Dashboard() {
                 onClick={() => setAllTicketsSubTab('UPDATE_REQUIRED')}
                 className={`px-3 py-1 text-xs font-semibold rounded transition-colors flex items-center focus:outline-none focus:ring-1 focus:ring-red-500 ${allTicketsSubTab === 'UPDATE_REQUIRED' ? 'bg-red-50 text-red-700' : 'text-slate-600 hover:text-slate-900'}`}
               >
-                {metrics?.update_required_count > 0 && <span className="mr-1.5 inline-flex items-center justify-center bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.25 rounded-full">{metrics.update_required_count}</span>}
+                {updateRequiredCount > 0 && <span className="mr-1.5 inline-flex items-center justify-center bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.25 rounded-full">{updateRequiredCount}</span>}
                 Update Required
               </button>
               <button

@@ -557,6 +557,12 @@ class AdminCollectionRef extends AdminQuery {
   doc(docId: string = crypto.randomUUID()) {
     return new AdminDocRef(this.colPath, docId);
   }
+
+  async add(data: any) {
+    const docRef = this.doc();
+    await docRef.set(data);
+    return docRef;
+  }
 }
 
 const fdb = {
@@ -2095,7 +2101,7 @@ app.put("/api/finance/bulk-po", authenticateToken, async (req: any, res: any) =>
 app.get("/api/dashboard/metrics", authenticateToken, async (req: any, res: any) => {
   try {
     const snap = await fdb.collection('tickets').get();
-    const tickets = snap.docs.map(d => d.data());
+    const tickets = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     const total = tickets.length;
     const processed = tickets.filter(t => t.stage3_completed).length;
     const no_show = tickets.filter(t => t.flight_status === 'NO_SHOW').length;
