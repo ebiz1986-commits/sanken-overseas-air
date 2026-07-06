@@ -3,7 +3,7 @@ import api from '../api';
 import toast from 'react-hot-toast';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import { useAuthStore } from '../store';
-import { LogOut, Plus, Search, Download, AlertCircle, AlertTriangle, X, Upload, Image, Eye, Trash2, LayoutGrid, List, FileText, File, ExternalLink, ChevronDown, ChevronUp, Users, Award, TrendingUp } from 'lucide-react';
+import { LogOut, Plus, Search, Download, AlertCircle, AlertTriangle, X, Upload, Image, Eye, Trash2, LayoutGrid, List, FileText, File, ExternalLink, ChevronDown, ChevronUp, Users, Award, TrendingUp, SlidersHorizontal } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -183,6 +183,73 @@ export const TicketProgressBar = ({ ticket }: { ticket: any }) => {
   );
 };
 
+export const renderStatusBadge = (status: string) => {
+  switch (status) {
+    case 'COMPLETED':
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-250 shadow-3xs">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span>Completed</span>
+        </span>
+      );
+    case 'DRAFT':
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-650 border border-slate-200 shadow-3xs">
+          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+          <span>Draft</span>
+        </span>
+      );
+    default:
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-3xs">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+          <span>In Progress</span>
+        </span>
+      );
+  }
+};
+
+export const renderFlightStatusBadge = (flight_status: string | null, departure_date?: string) => {
+  const status = flight_status || 'PENDING';
+  if (status === 'PENDING') {
+    if (departure_date && departure_date < format(new Date(), 'yyyy-MM-dd')) {
+      return (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-650 border border-rose-200 shadow-3xs leading-none select-none">
+          <AlertCircle className="w-3.5 h-3.5 mr-1 text-rose-500" /> Update Required
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-50 text-slate-500 border border-slate-200/60 leading-none select-none">
+        Pending
+      </span>
+    );
+  } else if (status === 'NO_SHOW') {
+    return (
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border border-red-250 bg-red-50 text-red-700 leading-none select-none shadow-3xs">
+        <span className="relative flex h-1.5 w-1.5 mr-1 shrink-0">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-600"></span>
+        </span>
+        No Show
+      </span>
+    );
+  } else if (status === 'DEPARTED') {
+    return (
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border border-emerald-250 bg-emerald-50 text-emerald-700 leading-none select-none shadow-3xs">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse" />
+        Departed
+      </span>
+    );
+  } else {
+    return (
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border border-sky-250 bg-sky-50 text-sky-700 leading-none select-none shadow-3xs capitalize">
+        {status.toLowerCase()}
+      </span>
+    );
+  }
+};
+
 export default function Dashboard() {
   const { role, logout, user, token } = useAuthStore();
   const navigate = useNavigate();
@@ -247,6 +314,38 @@ export default function Dashboard() {
   const [viewMode, setViewMode] = useState<'table' | 'cards'>(
     (localStorage.getItem('noIssueViewMode') as any) || 'cards'
   );
+
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
+    const saved = localStorage.getItem('dashboardVisibleColumns');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // ignore
+      }
+    }
+    return {
+      passenger_name: true,
+      pp_number: true,
+      attached_images: true,
+      project_id: true,
+      route: true,
+      ticketing_agency: true,
+      approved_cost: true,
+      invoice_details: true,
+      po_number: true,
+      status: true,
+      flight_status: true,
+      workflow: true
+    };
+  });
+
+  const [showColumnDropdown, setShowColumnDropdown] = useState(false);
+  const [selectedBudgetHealthFilter, setSelectedBudgetHealthFilter] = useState('ALL');
+
+  useEffect(() => {
+    localStorage.setItem('dashboardVisibleColumns', JSON.stringify(visibleColumns));
+  }, [visibleColumns]);
 
   const getTicketDocuments = (t: any) => {
     const docs: { url: string; label: string; type: 'atbf' | 'invoice_1' | 'invoice_sub' | 'generic'; field?: string; idx?: number }[] = [];
@@ -1658,6 +1757,218 @@ export default function Dashboard() {
 
             </div>
 
+            {/* Project Budget Health Cards Section */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mt-8">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <span className="inline-block w-2.5 h-5 bg-emerald-500 rounded-sm" />
+                    Project Budget Health Cards
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Real-time tracking of allocated travel budgets, spent & pending commitments, and active health status.
+                  </p>
+                </div>
+                {/* Health Filter buttons */}
+                <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+                  {['ALL', 'CRITICAL', 'WARNING', 'HEALTHY'].map((healthStatus) => {
+                    const count = (projects || []).filter(proj => {
+                      const totalCommitted = (proj.spent || 0) + (proj.pending || 0);
+                      const utilRate = proj.budget > 0 ? (totalCommitted / proj.budget) * 100 : 0;
+                      if (healthStatus === 'ALL') return true;
+                      if (healthStatus === 'CRITICAL') return utilRate >= 90;
+                      if (healthStatus === 'WARNING') return utilRate >= 70 && utilRate < 90;
+                      if (healthStatus === 'HEALTHY') return utilRate < 70;
+                      return true;
+                    }).length;
+                    
+                    return (
+                      <button
+                        key={healthStatus}
+                        type="button"
+                        onClick={() => setSelectedBudgetHealthFilter(healthStatus)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                          selectedBudgetHealthFilter === healthStatus
+                            ? healthStatus === 'CRITICAL' ? 'bg-red-100 text-red-750 border border-red-300'
+                              : healthStatus === 'WARNING' ? 'bg-amber-100 text-amber-705 border border-amber-300'
+                              : healthStatus === 'HEALTHY' ? 'bg-emerald-100 text-emerald-850 border border-emerald-350'
+                              : 'bg-slate-900 text-white'
+                            : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+                        }`}
+                      >
+                        {healthStatus} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Aggregated Budget stats row */}
+              {(() => {
+                const totalBudget = (projects || []).reduce((acc, p) => acc + (p.budget || 0), 0);
+                const totalSpent = (projects || []).reduce((acc, p) => acc + (p.spent || 0), 0);
+                const totalPending = (projects || []).reduce((acc, p) => acc + (p.pending || 0), 0);
+                const overallCommitted = totalSpent + totalPending;
+                const overallUtilRate = totalBudget > 0 ? Math.round((overallCommitted / totalBudget) * 100) : 0;
+                
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Total Project Budget</span>
+                      <span className="text-lg font-black text-slate-900 font-mono">${totalBudget.toLocaleString()}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Total Spent (Paid)</span>
+                      <span className="text-lg font-black text-emerald-600 font-mono">${totalSpent.toLocaleString()}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Total Committed (Unpaid)</span>
+                      <span className="text-lg font-black text-amber-600 font-mono">${totalPending.toLocaleString()}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Overall Utilization</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg font-black text-slate-900 font-mono">{overallUtilRate}%</span>
+                        <div className="flex-1 bg-slate-200 rounded-full h-2 max-w-[100px] overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${
+                              overallUtilRate >= 90 ? 'bg-red-500' : overallUtilRate >= 70 ? 'bg-amber-500' : 'bg-emerald-500'
+                            }`}
+                            style={{ width: `${Math.min(overallUtilRate, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Cards grid */}
+              {(() => {
+                const filteredProjects = (projects || []).filter(proj => {
+                  const totalCommitted = (proj.spent || 0) + (proj.pending || 0);
+                  const utilRate = proj.budget > 0 ? (totalCommitted / proj.budget) * 100 : 0;
+                  if (selectedBudgetHealthFilter === 'ALL') return true;
+                  if (selectedBudgetHealthFilter === 'CRITICAL') return utilRate >= 90;
+                  if (selectedBudgetHealthFilter === 'WARNING') return utilRate >= 70 && utilRate < 90;
+                  if (selectedBudgetHealthFilter === 'HEALTHY') return utilRate < 70;
+                  return true;
+                });
+
+                if (filteredProjects.length === 0) {
+                  return (
+                    <div className="text-center text-xs text-slate-400 py-10 border border-dashed border-slate-200 rounded-xl bg-slate-50/20">
+                      No projects match the selected budget health filter.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredProjects.map((proj) => {
+                      const totalCommitted = (proj.spent || 0) + (proj.pending || 0);
+                      const utilRate = proj.budget > 0 ? Math.round((totalCommitted / proj.budget) * 100) : 0;
+                      const remaining = (proj.budget || 0) - totalCommitted;
+                      
+                      let healthLabel = 'Healthy';
+                      let cardBorder = 'border-slate-200 hover:border-emerald-300';
+                      let progressColor = 'bg-emerald-500';
+                      let bgGradient = 'from-emerald-50/10 to-transparent';
+                      let badgeStyle = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                      
+                      if (utilRate >= 100) {
+                        healthLabel = 'Budget Exceeded';
+                        cardBorder = 'border-red-300 hover:border-red-400 ring-1 ring-red-500/20 shadow-xs';
+                        progressColor = 'bg-red-650';
+                        bgGradient = 'from-red-50/20 to-transparent';
+                        badgeStyle = 'bg-red-100 text-red-800 border-red-300 animate-pulse font-black';
+                      } else if (utilRate >= 90) {
+                        healthLabel = 'Critical';
+                        cardBorder = 'border-red-250 hover:border-red-350 shadow-xs';
+                        progressColor = 'bg-red-500';
+                        bgGradient = 'from-red-50/10 to-transparent';
+                        badgeStyle = 'bg-red-100 text-red-700 border-red-200';
+                      } else if (utilRate >= 70) {
+                        healthLabel = 'Warning';
+                        cardBorder = 'border-amber-250 hover:border-amber-350';
+                        progressColor = 'bg-amber-500';
+                        bgGradient = 'from-amber-50/10 to-transparent';
+                        badgeStyle = 'bg-amber-50 text-amber-700 border-amber-200';
+                      }
+
+                      return (
+                        <div
+                          key={proj.id}
+                          className={`bg-gradient-to-b ${bgGradient} bg-white rounded-xl border ${cardBorder} p-5 flex flex-col justify-between transition-all duration-200 hover:shadow-xs relative overflow-hidden`}
+                        >
+                          <div>
+                            <div className="flex justify-between items-start gap-2 mb-3">
+                              <h4 className="text-xs font-bold text-slate-900 line-clamp-1 leading-snug" title={proj.name}>
+                                {proj.name}
+                              </h4>
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border shrink-0 ${badgeStyle}`}>
+                                {healthLabel}
+                              </span>
+                            </div>
+
+                            {/* Progress bar visual */}
+                            <div className="space-y-1.5 mb-4">
+                              <div className="flex justify-between text-[10px] font-extrabold text-slate-500">
+                                <span>Utilization Rate</span>
+                                <span className={utilRate >= 90 ? 'text-red-650' : utilRate >= 70 ? 'text-amber-600' : 'text-emerald-700'}>
+                                  {utilRate}%
+                                </span>
+                              </div>
+                              <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden border border-slate-150/50">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-500 ${progressColor}`}
+                                  style={{ width: `${Math.min(utilRate, 100)}%` }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Details list */}
+                            <div className="grid grid-cols-2 gap-y-2.5 gap-x-2 text-[10.5px] border-t border-slate-100 pt-3 font-medium">
+                              <div>
+                                <span className="text-slate-400 block text-[9.5px] uppercase tracking-wider font-extrabold">Allocated Budget</span>
+                                <span className="text-slate-800 font-mono font-bold">${(proj.budget || 0).toLocaleString()}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 block text-[9.5px] uppercase tracking-wider font-extrabold">Total Committed</span>
+                                <span className="text-slate-800 font-mono font-bold">${totalCommitted.toLocaleString()}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 block text-[9.5px] uppercase tracking-wider font-extrabold">Spent (Paid)</span>
+                                <span className="text-emerald-600 font-mono font-bold">${(proj.spent || 0).toLocaleString()}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 block text-[9.5px] uppercase tracking-wider font-extrabold">Pending (Unpaid)</span>
+                                <span className="text-amber-600 font-mono font-bold">${(proj.pending || 0).toLocaleString()}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Remaining balance box */}
+                          <div className={`mt-4 p-2 rounded-lg text-center font-mono ${
+                            remaining < 0 
+                              ? 'bg-rose-50 text-red-750 border border-rose-200' 
+                              : 'bg-slate-50 text-slate-700 border border-slate-100'
+                          } border text-[10.5px]`}>
+                            <span className="font-semibold uppercase text-[9px] tracking-wider block text-slate-400">
+                              {remaining < 0 ? 'Deficit / Overdraft' : 'Remaining Balance'}
+                            </span>
+                            <span className="text-xs font-black">
+                              {remaining < 0 ? `-$${Math.abs(remaining).toLocaleString()}` : `$${remaining.toLocaleString()}`}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+
             {/* Sub-contractor Ticket Entitlements Summary Section */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mt-8">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
@@ -1950,6 +2261,75 @@ export default function Dashboard() {
                 >
                   <Plus className="h-4 w-4 mr-1" aria-hidden="true" /> New Ticket
                 </button>
+              )}
+              {activeTab === 'ALL_TICKETS' && allTicketsSubTab !== 'SUMMARY' && (
+                <div className="relative ml-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowColumnDropdown(!showColumnDropdown)}
+                    className="inline-flex items-center px-3 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg transition-colors focus:outline-none focus:ring-1 focus:ring-sky-500 shadow-xs"
+                    aria-label="Toggle Columns Visibility"
+                  >
+                    <SlidersHorizontal className="h-3.5 w-3.5 mr-1 text-slate-500" />
+                    <span>Columns</span>
+                  </button>
+                  {showColumnDropdown && (
+                    <div className="absolute right-0 mt-1 w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-50 p-2 text-xs">
+                      <div className="font-semibold text-slate-700 px-2 py-1 border-b border-slate-100 mb-1 flex justify-between items-center">
+                        <span>Show/Hide Columns</span>
+                        <button 
+                          type="button" 
+                          onClick={() => setVisibleColumns({
+                            passenger_name: true,
+                            pp_number: true,
+                            attached_images: true,
+                            project_id: true,
+                            route: true,
+                            ticketing_agency: true,
+                            approved_cost: true,
+                            invoice_details: true,
+                            po_number: true,
+                            status: true,
+                            flight_status: true,
+                            workflow: true
+                          })}
+                          className="text-[10px] text-sky-600 hover:underline"
+                        >
+                          Reset
+                        </button>
+                      </div>
+                      <div className="space-y-1 max-h-60 overflow-y-auto py-1">
+                        {[
+                          { key: 'passenger_name', label: 'Passenger Name' },
+                          { key: 'pp_number', label: 'Passport Number' },
+                          { key: 'attached_images', label: 'Attached Images' },
+                          { key: 'project_id', label: 'Project' },
+                          { key: 'route', label: 'Route' },
+                          { key: 'ticketing_agency', label: 'Ticketing Agency' },
+                          { key: 'approved_cost', label: 'Approved Cost' },
+                          { key: 'invoice_details', label: 'Invoice Details' },
+                          { key: 'po_number', label: 'PO Number' },
+                          { key: 'status', label: 'Status' },
+                          { key: 'flight_status', label: 'Flight Status' },
+                          { key: 'workflow', label: 'Workflow Progress' },
+                        ].map((col) => (
+                          <label key={col.key} className="flex items-center space-x-2 px-2 py-1 hover:bg-slate-50 rounded cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={visibleColumns[col.key] ?? true}
+                              onChange={(e) => setVisibleColumns({
+                                ...visibleColumns,
+                                [col.key]: e.target.checked
+                              })}
+                              className="rounded border-slate-300 text-sky-600 focus:ring-sky-500 w-3.5 h-3.5"
+                            />
+                            <span className="text-slate-700 font-medium">{col.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
               {activeTab === 'ALL_TICKETS' && allTicketsSubTab === 'NO_ISSUE' && (
                 <div className="bg-slate-100 p-0.5 rounded-lg border border-slate-200 inline-flex shadow-inner ml-2">
@@ -2295,33 +2675,33 @@ export default function Dashboard() {
                     </>
                   ) : activeTab === 'ALL_TICKETS' && allTicketsSubTab === 'NO_ISSUE' ? (
                     <>
-                      <th onClick={() => handleSort('passenger_name')} className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none w-44 min-w-[176px] max-w-[200px]">Passenger {sortKey === 'passenger_name' && (sortDir === 'asc' ? '↑' : '↓')}</th>
-                      <th onClick={() => handleSort('pp_number')} className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none">PP Number {sortKey === 'pp_number' && (sortDir === 'asc' ? '↑' : '↓')}</th>
-                      <th className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Attached Image(s)</th>
-                      <th onClick={() => handleSort('project_id')} className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none w-40 min-w-[160px] max-w-[185px] whitespace-normal">Project {sortKey === 'project_id' && (sortDir === 'asc' ? '↑' : '↓')}</th>
-                      <th className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Route</th>
-                      <th className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Ticketing Agency</th>
-                      <th className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Approved Cost</th>
-                      <th className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Invoice Details</th>
-                      <th className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">PO Number</th>
-                      <th onClick={() => handleSort('status')} className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none">Status {sortKey === 'status' && (sortDir === 'asc' ? '↑' : '↓')}</th>
-                      <th onClick={() => handleSort('flight_status')} className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none">Flight Status {sortKey === 'flight_status' && (sortDir === 'asc' ? '↑' : '↓')}</th>
-                      <th onClick={() => handleSort('departure_date')} className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none">Workflow Progress {sortKey === 'departure_date' && (sortDir === 'asc' ? '↑' : '↓')}</th>
+                      {(visibleColumns.passenger_name ?? true) && <th onClick={() => handleSort('passenger_name')} className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none w-44 min-w-[176px] max-w-[200px]">Passenger {sortKey === 'passenger_name' && (sortDir === 'asc' ? '↑' : '↓')}</th>}
+                      {(visibleColumns.pp_number ?? true) && <th onClick={() => handleSort('pp_number')} className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none">PP Number {sortKey === 'pp_number' && (sortDir === 'asc' ? '↑' : '↓')}</th>}
+                      {(visibleColumns.attached_images ?? true) && <th className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Attached Image(s)</th>}
+                      {(visibleColumns.project_id ?? true) && <th onClick={() => handleSort('project_id')} className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none w-40 min-w-[160px] max-w-[185px] whitespace-normal">Project {sortKey === 'project_id' && (sortDir === 'asc' ? '↑' : '↓')}</th>}
+                      {(visibleColumns.route ?? true) && <th className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Route</th>}
+                      {(visibleColumns.ticketing_agency ?? true) && <th className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Ticketing Agency</th>}
+                      {(visibleColumns.approved_cost ?? true) && <th className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Approved Cost</th>}
+                      {(visibleColumns.invoice_details ?? true) && <th className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Invoice Details</th>}
+                      {(visibleColumns.po_number ?? true) && <th className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">PO Number</th>}
+                      {(visibleColumns.status ?? true) && <th onClick={() => handleSort('status')} className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none">Status {sortKey === 'status' && (sortDir === 'asc' ? '↑' : '↓')}</th>}
+                      {(visibleColumns.flight_status ?? true) && <th onClick={() => handleSort('flight_status')} className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none">Flight Status {sortKey === 'flight_status' && (sortDir === 'asc' ? '↑' : '↓')}</th>}
+                      {(visibleColumns.workflow ?? true) && <th onClick={() => handleSort('departure_date')} className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none">Workflow Progress {sortKey === 'departure_date' && (sortDir === 'asc' ? '↑' : '↓')}</th>}
                       <th className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
                     </>
                   ) : (
                     <>
-                      <th onClick={() => handleSort('passenger_name')} className="px-3 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none w-44 min-w-[176px] max-w-[200px]">Passenger {sortKey === 'passenger_name' && (sortDir === 'asc' ? '↑' : '↓')}</th>
-                      <th onClick={() => handleSort('pp_number')} className="px-3 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none">PP Number {sortKey === 'pp_number' && (sortDir === 'asc' ? '↑' : '↓')}</th>
-                      <th onClick={() => handleSort('project_id')} className="px-3 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none w-40 min-w-[160px] max-w-[185px] whitespace-normal">Project {sortKey === 'project_id' && (sortDir === 'asc' ? '↑' : '↓')}</th>
-                      <th className="px-1 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Route</th>
-                      <th className="px-1 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Ticketing Agency</th>
-                      <th className="px-3 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Approved Cost</th>
-                      <th className="px-3 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Invoice Details</th>
-                      <th className="px-3 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">PO Number</th>
-                      <th onClick={() => handleSort('status')} className="px-3 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none">Status {sortKey === 'status' && (sortDir === 'asc' ? '↑' : '↓')}</th>
-                      <th onClick={() => handleSort('flight_status')} className="px-3 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none">Flight Status {sortKey === 'flight_status' && (sortDir === 'asc' ? '↑' : '↓')}</th>
-                      <th onClick={() => handleSort('departure_date')} className="px-3 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none">Workflow Progress {sortKey === 'departure_date' && (sortDir === 'asc' ? '↑' : '↓')}</th>
+                      {(visibleColumns.passenger_name ?? true) && <th onClick={() => handleSort('passenger_name')} className="px-3 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none w-44 min-w-[176px] max-w-[200px]">Passenger {sortKey === 'passenger_name' && (sortDir === 'asc' ? '↑' : '↓')}</th>}
+                      {(visibleColumns.pp_number ?? true) && <th onClick={() => handleSort('pp_number')} className="px-3 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none">PP Number {sortKey === 'pp_number' && (sortDir === 'asc' ? '↑' : '↓')}</th>}
+                      {(visibleColumns.project_id ?? true) && <th onClick={() => handleSort('project_id')} className="px-3 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none w-40 min-w-[160px] max-w-[185px] whitespace-normal">Project {sortKey === 'project_id' && (sortDir === 'asc' ? '↑' : '↓')}</th>}
+                      {(visibleColumns.route ?? true) && <th className="px-1 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Route</th>}
+                      {(visibleColumns.ticketing_agency ?? true) && <th className="px-1 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Ticketing Agency</th>}
+                      {(visibleColumns.approved_cost ?? true) && <th className="px-3 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Approved Cost</th>}
+                      {(visibleColumns.invoice_details ?? true) && <th className="px-3 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Invoice Details</th>}
+                      {(visibleColumns.po_number ?? true) && <th className="px-3 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">PO Number</th>}
+                      {(visibleColumns.status ?? true) && <th onClick={() => handleSort('status')} className="px-3 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none">Status {sortKey === 'status' && (sortDir === 'asc' ? '↑' : '↓')}</th>}
+                      {(visibleColumns.flight_status ?? true) && <th onClick={() => handleSort('flight_status')} className="px-3 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none">Flight Status {sortKey === 'flight_status' && (sortDir === 'asc' ? '↑' : '↓')}</th>}
+                      {(visibleColumns.workflow ?? true) && <th onClick={() => handleSort('departure_date')} className="px-3 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none">Workflow Progress {sortKey === 'departure_date' && (sortDir === 'asc' ? '↑' : '↓')}</th>}
                       <th className="px-3 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
                     </>
                   )}
@@ -2445,217 +2825,234 @@ export default function Dashboard() {
                         </>
                       ) : activeTab === 'ALL_TICKETS' && allTicketsSubTab === 'NO_ISSUE' ? (
                         <>
-                          <td className="px-3.5 py-1.5 w-44 min-w-[176px] max-w-[200px] whitespace-normal">
-                            <div className="font-semibold text-slate-900 text-[11.5px] leading-tight break-words">{t.passenger_name}</div>
-                          </td>
-                          <td className="px-3.5 py-1.5 whitespace-nowrap text-slate-600 text-[11px]">{t.pp_number}</td>
+                          {(visibleColumns.passenger_name ?? true) && (
+                            <td className="px-3.5 py-1.5 w-44 min-w-[176px] max-w-[200px] whitespace-normal">
+                              <div className="font-semibold text-slate-900 text-[11.5px] leading-tight break-words">{t.passenger_name}</div>
+                            </td>
+                          )}
+                          {(visibleColumns.pp_number ?? true) && (
+                            <td className="px-3.5 py-1.5 whitespace-nowrap text-slate-600 text-[11px]">{t.pp_number}</td>
+                          )}
                           
                           {/* Attached image(s) column */}
-                          <td className="px-3.5 py-1.5 whitespace-nowrap">
-                            <div className="flex items-center space-x-2">
-                              {getTicketDocuments(t).length > 0 ? (
-                                <div className="flex -space-x-1 overflow-hidden">
-                                  {getTicketDocuments(t).map((doc, idx) => (
-                                    <div 
-                                      key={idx} 
-                                      className="relative group w-6.5 h-6.5 rounded-md border border-slate-200 overflow-hidden shadow-sm hover:z-10 hover:scale-110 cursor-pointer transition-transform bg-slate-50 flex items-center justify-center animate-fade-in" 
-                                      onClick={(e) => { e.stopPropagation(); setLightboxImage(doc.url); }}
-                                      title={doc.label}
-                                    >
-                                      {isWebUrl(doc.url) ? (
-                                        <div className="w-full h-full bg-sky-500/5 flex flex-col items-center justify-center">
-                                          <ExternalLink className="w-3 h-3 text-sky-600" />
-                                          <span className="text-[4px] font-extrabold text-sky-600 uppercase block leading-none">WEB</span>
-                                        </div>
-                                      ) : isPdfUrl(doc.url) ? (
-                                        <div className="w-full h-full bg-red-500/5 flex flex-col items-center justify-center">
-                                          <FileText className="w-3 h-3 text-red-500" />
-                                          <span className="text-[4px] font-extrabold text-red-600 uppercase block leading-none">PDF</span>
-                                        </div>
-                                      ) : (
-                                        <div className="w-full h-full bg-slate-100 flex flex-col items-center justify-center">
-                                          <File className="w-3 h-3 text-slate-500" />
-                                        </div>
-                                      )}
-                                      <span className="absolute bottom-0 right-0 max-w-[18px] bg-slate-800/80 text-[4px] font-sans text-white px-px py-0 uppercase truncate rounded rounded-r-none font-semibold select-none">{doc.label}</span>
-                                      {/* Mini delete on hover - only for general attachments, or structured if admin/agent */}
-                                      {doc.type === 'generic' ? (
-                                        <button
-                                          type="button"
-                                          className="absolute inset-0 bg-red-650/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                                          title={`Delete ${doc.label}`}
-                                          onClick={async (e) => {
-                                            e.stopPropagation();
-                                            if (doc.idx !== undefined) {
-                                              await handleImageDelete(t.id, doc.idx);
-                                            }
-                                          }}
-                                        >
-                                          <X className="w-2.5 h-2.5" />
-                                        </button>
-                                      ) : (
-                                        ['ADMIN', 'ADMIN1', 'AGENT', 'FINANCE'].includes(role) && (
+                          {(visibleColumns.attached_images ?? true) && (
+                            <td className="px-3.5 py-1.5 whitespace-nowrap">
+                              <div className="flex items-center space-x-2">
+                                {getTicketDocuments(t).length > 0 ? (
+                                  <div className="flex -space-x-1 overflow-hidden">
+                                    {getTicketDocuments(t).map((doc, idx) => (
+                                      <div 
+                                        key={idx} 
+                                        className="relative group w-6.5 h-6.5 rounded-md border border-slate-200 overflow-hidden shadow-sm hover:z-10 hover:scale-110 cursor-pointer transition-transform bg-slate-50 flex items-center justify-center animate-fade-in" 
+                                        onClick={(e) => { e.stopPropagation(); setLightboxImage(doc.url); }}
+                                        title={doc.label}
+                                      >
+                                        {isWebUrl(doc.url) ? (
+                                          <div className="w-full h-full bg-sky-500/5 flex flex-col items-center justify-center">
+                                            <ExternalLink className="w-3 h-3 text-sky-600" />
+                                            <span className="text-[4px] font-extrabold text-sky-600 uppercase block leading-none">WEB</span>
+                                          </div>
+                                        ) : isPdfUrl(doc.url) ? (
+                                          <div className="w-full h-full bg-red-500/5 flex flex-col items-center justify-center">
+                                            <FileText className="w-3 h-3 text-red-500" />
+                                            <span className="text-[4px] font-extrabold text-red-600 uppercase block leading-none">PDF</span>
+                                          </div>
+                                        ) : (
+                                          <div className="w-full h-full bg-slate-100 flex flex-col items-center justify-center">
+                                            <File className="w-3 h-3 text-slate-500" />
+                                          </div>
+                                        )}
+                                        <span className="absolute bottom-0 right-0 max-w-[18px] bg-slate-800/80 text-[4px] font-sans text-white px-px py-0 uppercase truncate rounded rounded-r-none font-semibold select-none">{doc.label}</span>
+                                        {/* Mini delete on hover - only for general attachments, or structured if admin/agent */}
+                                        {doc.type === 'generic' ? (
                                           <button
                                             type="button"
                                             className="absolute inset-0 bg-red-650/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                                             title={`Delete ${doc.label}`}
                                             onClick={async (e) => {
                                               e.stopPropagation();
-                                              if (!window.confirm(`Delete this attached ${doc.label}?`)) return;
-                                              try {
-                                                await api.put(`/tickets/${t.id}/documents`, { [doc.field || doc.type]: '' });
-                                                toast.success(`${doc.label} removed`);
-                                                fetchData();
-                                              } catch (err) {
-                                                toast.error('Failed to remove document');
+                                              if (doc.idx !== undefined) {
+                                                await handleImageDelete(t.id, doc.idx);
                                               }
                                             }}
                                           >
                                             <X className="w-2.5 h-2.5" />
                                           </button>
-                                        )
-                                      )}
-                                    </div>
-                                  ))}
+                                        ) : (
+                                          ['ADMIN', 'ADMIN1', 'AGENT', 'FINANCE'].includes(role) && (
+                                            <button
+                                              type="button"
+                                              className="absolute inset-0 bg-red-650/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                              title={`Delete ${doc.label}`}
+                                              onClick={async (e) => {
+                                                e.stopPropagation();
+                                                if (!window.confirm(`Delete this attached ${doc.label}?`)) return;
+                                                try {
+                                                  await api.put(`/tickets/${t.id}/documents`, { [doc.field || doc.type]: '' });
+                                                  toast.success(`${doc.label} removed`);
+                                                  fetchData();
+                                                } catch (err) {
+                                                  toast.error('Failed to remove document');
+                                                }
+                                              }}
+                                            >
+                                              <X className="w-2.5 h-2.5" />
+                                            </button>
+                                          )
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="text-slate-400 text-[10.5px] italic flex items-center select-none">
+                                    <Image className="w-3 h-3 mr-1 opacity-60" /> None
+                                  </div>
+                                )}
+                                <button 
+                                  type="button" 
+                                  className="p-0.5 rounded-md border border-slate-200 hover:border-sky-500 hover:bg-sky-50 text-slate-500 hover:text-sky-600 transition-colors" 
+                                  title="Attach scan/image"
+                                  onClick={(e) => { e.stopPropagation(); setUploadTicketId(t.id); }}
+                                >
+                                  <Plus className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </td>
+                          )}
+
+                          {(visibleColumns.project_id ?? true) && (
+                            <td className="px-3.5 py-1.5 w-40 min-w-[160px] max-w-[185px] whitespace-normal break-words text-slate-600 text-[11px]">
+                              {
+                                Array.isArray(t.project_ids) && t.project_ids.length > 0
+                                  ? t.project_ids.map((id: string) => allProjects.find(p => p.id === id)?.name || id).join(', ')
+                                  : (allProjects.find(p => p.id === t.project_id)?.name || t.project_id || '-')
+                              }
+                            </td>
+                          )}
+                          {(visibleColumns.route ?? true) && (
+                            <td className="px-3.5 py-1.5 whitespace-nowrap text-slate-600 text-[11px] font-mono">{t.route || '-'}</td>
+                          )}
+                          {(visibleColumns.ticketing_agency ?? true) && (
+                            <td className="px-3.5 py-1.5 whitespace-nowrap text-slate-700 text-[11px] font-medium">{t.travel_agent || '-'}</td>
+                          )}
+                          {(visibleColumns.approved_cost ?? true) && (
+                            <td className="px-3.5 py-1.5 whitespace-nowrap text-slate-600 text-[11px]">
+                              {!!(t.rescheduled_departure_date || t.other_invoice_number) ? (
+                                <div className="flex flex-col gap-0.5">
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1 rounded leading-none py-0.5" title="Original Ticket Approved Cost">1st</span>
+                                    <span className="text-slate-600 font-medium">${Number(t.approved_rate || t.price || 0).toLocaleString()}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1 rounded leading-none py-0.5" title="Rescheduled Ticket Approved Cost">2nd</span>
+                                    <span className="text-slate-800 font-bold">${Number(t.rescheduled_ticket_amount || 0).toLocaleString()}</span>
+                                  </div>
                                 </div>
                               ) : (
-                                <div className="text-slate-400 text-[10.5px] italic flex items-center select-none">
-                                  <Image className="w-3 h-3 mr-1 opacity-60" /> None
-                                </div>
+                                t.approved_rate ? `$${Number(t.approved_rate).toLocaleString()}` : '-'
                               )}
-                              <button 
-                                type="button" 
-                                className="p-0.5 rounded-md border border-slate-200 hover:border-sky-500 hover:bg-sky-50 text-slate-500 hover:text-sky-600 transition-colors" 
-                                title="Attach scan/image"
-                                onClick={(e) => { e.stopPropagation(); setUploadTicketId(t.id); }}
-                              >
-                                <Plus className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </td>
-
-                          <td className="px-3.5 py-1.5 w-40 min-w-[160px] max-w-[185px] whitespace-normal break-words text-slate-600 text-[11px]">
-                            {
-                              Array.isArray(t.project_ids) && t.project_ids.length > 0
-                                ? t.project_ids.map((id: string) => allProjects.find(p => p.id === id)?.name || id).join(', ')
-                                : (allProjects.find(p => p.id === t.project_id)?.name || t.project_id || '-')
-                            }
-                          </td>
-                          <td className="px-3.5 py-1.5 whitespace-nowrap text-slate-600 text-[11px] font-mono">{t.route || '-'}</td>
-                          <td className="px-3.5 py-1.5 whitespace-nowrap text-slate-700 text-[11px] font-medium">{t.travel_agent || '-'}</td>
-                          <td className="px-3.5 py-1.5 whitespace-nowrap text-slate-600 text-[11px]">
-                            {!!(t.rescheduled_departure_date || t.other_invoice_number) ? (
-                              <div className="flex flex-col gap-0.5">
-                                <div className="flex items-center gap-1">
-                                  <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1 rounded leading-none py-0.5" title="Original Ticket Approved Cost">1st</span>
-                                  <span className="text-slate-600 font-medium">${Number(t.approved_rate || t.price || 0).toLocaleString()}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1 rounded leading-none py-0.5" title="Rescheduled Ticket Approved Cost">2nd</span>
-                                  <span className="text-slate-800 font-bold">${Number(t.rescheduled_ticket_amount || 0).toLocaleString()}</span>
-                                </div>
-                              </div>
-                            ) : (
-                              t.approved_rate ? `$${Number(t.approved_rate).toLocaleString()}` : '-'
-                            )}
-                          </td>
-                          <td className="px-3.5 py-1.5 whitespace-nowrap text-slate-600 text-[11px]">
-                            {!!(t.rescheduled_departure_date || t.other_invoice_number) ? (
-                              <div className="flex flex-col gap-1">
-                                {(t.invoice_number || t.first_invoice_number) ? (
-                                  <div className="flex items-start gap-1">
-                                    <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1 rounded leading-none mt-0.5" title="Original Invoice">1st</span>
-                                    <div>
-                                      <span className="font-mono text-slate-600 text-[11px] block leading-none">{t.invoice_number || t.first_invoice_number}</span>
-                                      {(t.invoice_amount || t.first_invoice_amount) && (
-                                        <span className="text-[10px] text-slate-500">${Number(t.invoice_amount || t.first_invoice_amount).toLocaleString()}</span>
-                                      )}
+                            </td>
+                          )}
+                          {(visibleColumns.invoice_details ?? true) && (
+                            <td className="px-3.5 py-1.5 whitespace-nowrap text-slate-600 text-[11px]">
+                              {!!(t.rescheduled_departure_date || t.other_invoice_number) ? (
+                                <div className="flex flex-col gap-1">
+                                  {(t.invoice_number || t.first_invoice_number) ? (
+                                    <div className="flex items-start gap-1">
+                                      <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1 rounded leading-none mt-0.5" title="Original Invoice">1st</span>
+                                      <div>
+                                        <span className="font-mono text-slate-600 text-[11px] block leading-none">{t.invoice_number || t.first_invoice_number}</span>
+                                        {(t.invoice_amount || t.first_invoice_amount) && (
+                                          <span className="text-[10px] text-slate-500">${Number(t.invoice_amount || t.first_invoice_amount).toLocaleString()}</span>
+                                        )}
+                                      </div>
                                     </div>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-1 text-slate-400 italic text-[10px]">
-                                    <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1 rounded leading-none">1st</span>
-                                    -
-                                  </div>
-                                )}
-                                {t.other_invoice_number ? (
-                                  <div className="flex items-start gap-1">
-                                    <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1 rounded leading-none mt-0.5" title="Rescheduled Invoice">2nd</span>
-                                    <div>
-                                      <span className="font-mono text-slate-800 font-semibold text-[11px] block leading-none">{t.other_invoice_number}</span>
-                                      {t.rescheduled_ticket_amount && (
-                                        <span className="text-[10px] text-orange-600 font-medium">${Number(t.rescheduled_ticket_amount).toLocaleString()}</span>
-                                      )}
+                                  ) : (
+                                    <div className="flex items-center gap-1 text-slate-400 italic text-[10px]">
+                                      <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1 rounded leading-none">1st</span>
+                                      -
                                     </div>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-1 text-slate-400 italic text-[10px]">
-                                    <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1 rounded leading-none">2nd</span>
-                                    Pending Invoice
-                                  </div>
-                                )}
-                                {t.po_status === 'payment done' && (
-                                  <span className="inline-flex items-center w-fit px-1.5 py-0.25 rounded text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase tracking-wide mt-0.5">
-                                    ✓ Paid
-                                  </span>
-                                )}
-                              </div>
-                            ) : (
-                              t.invoice_number || t.first_invoice_number ? (
-                                <div>
-                                  <span className="font-mono text-slate-800">{t.invoice_number || t.first_invoice_number}</span>
-                                  {(t.invoice_amount || t.first_invoice_amount) && (
-                                    <span className="block text-[10px] text-slate-500">${Number(t.invoice_amount || t.first_invoice_amount).toLocaleString()}</span>
+                                  )}
+                                  {t.other_invoice_number ? (
+                                    <div className="flex items-start gap-1">
+                                      <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1 rounded leading-none mt-0.5" title="Rescheduled Invoice">2nd</span>
+                                      <div>
+                                        <span className="font-mono text-slate-800 font-semibold text-[11px] block leading-none">{t.other_invoice_number}</span>
+                                        {t.rescheduled_ticket_amount && (
+                                          <span className="text-[10px] text-orange-600 font-medium">${Number(t.rescheduled_ticket_amount).toLocaleString()}</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-1 text-slate-400 italic text-[10px]">
+                                      <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1 rounded leading-none">2nd</span>
+                                      Pending Invoice
+                                    </div>
                                   )}
                                   {t.po_status === 'payment done' && (
-                                    <span className="inline-flex items-center px-1.5 py-0.25 rounded text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-100 mt-0.5 uppercase tracking-wide">
+                                    <span className="inline-flex items-center w-fit px-1.5 py-0.25 rounded text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase tracking-wide mt-0.5">
                                       ✓ Paid
                                     </span>
                                   )}
                                 </div>
-                              ) : '-'
-                            )}
-                          </td>
-                          <td className="px-3.5 py-1.5 whitespace-nowrap text-slate-600 text-[11px] font-mono">
-                            {!!(t.rescheduled_departure_date || t.other_invoice_number) ? (
-                              <div className="flex flex-col gap-1">
-                                <div className="flex items-center gap-1">
-                                  <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1 rounded leading-none py-0.5" title="Original PO">1st</span>
-                                  <span className="font-mono text-slate-600">{t.po_number || 'Pending'}</span>
+                              ) : (
+                                t.invoice_number || t.first_invoice_number ? (
+                                  <div>
+                                    <span className="font-mono text-slate-800">{t.invoice_number || t.first_invoice_number}</span>
+                                    {(t.invoice_amount || t.first_invoice_amount) && (
+                                      <span className="block text-[10px] text-slate-500">${Number(t.invoice_amount || t.first_invoice_amount).toLocaleString()}</span>
+                                    )}
+                                    {t.po_status === 'payment done' && (
+                                      <span className="inline-flex items-center px-1.5 py-0.25 rounded text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-100 mt-0.5 uppercase tracking-wide">
+                                        ✓ Paid
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : '-'
+                              )}
+                            </td>
+                          )}
+                          {(visibleColumns.po_number ?? true) && (
+                            <td className="px-3.5 py-1.5 whitespace-nowrap text-slate-600 text-[11px] font-mono">
+                              {!!(t.rescheduled_departure_date || t.other_invoice_number) ? (
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1 rounded leading-none py-0.5" title="Original PO">1st</span>
+                                    <span className="font-mono text-slate-600">{t.po_number || 'Pending'}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1 rounded leading-none py-0.5" title="Rescheduled PO">2nd</span>
+                                    <span className="font-mono text-slate-800 font-semibold">{t.other_po_number || 'Pending'}</span>
+                                  </div>
+                                  {t.po_status === 'payment done' && (
+                                    <span className="block text-[9px] font-black uppercase text-emerald-700 bg-emerald-50 px-1 py-0.25 rounded border border-emerald-200 w-fit leading-none mt-0.5">Paid</span>
+                                  )}
                                 </div>
-                                <div className="flex items-center gap-1">
-                                  <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1 rounded leading-none py-0.5" title="Rescheduled PO">2nd</span>
-                                  <span className="font-mono text-slate-800 font-semibold">{t.other_po_number || 'Pending'}</span>
+                              ) : (
+                                <div>
+                                  <span>{t.po_number || '-'}</span>
+                                  {t.po_status === 'payment done' && (
+                                    <span className="block text-[9px] font-black uppercase text-emerald-700 bg-emerald-50 px-1 py-0.25 rounded border border-emerald-200 mt-0.5 w-fit">Paid</span>
+                                  )}
                                 </div>
-                                {t.po_status === 'payment done' && (
-                                  <span className="block text-[9px] font-black uppercase text-emerald-700 bg-emerald-50 px-1 py-0.25 rounded border border-emerald-200 w-fit leading-none mt-0.5">Paid</span>
-                                )}
-                              </div>
-                            ) : (
-                              <div>
-                                <span>{t.po_number || '-'}</span>
-                                {t.po_status === 'payment done' && (
-                                  <span className="block text-[9px] font-black uppercase text-emerald-700 bg-emerald-50 px-1 py-0.25 rounded border border-emerald-200 mt-0.5 w-fit">Paid</span>
-                                )}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-3.5 py-1.5 whitespace-nowrap">
-                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold
-                              ${t.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : 
-                                t.status === 'DRAFT' ? 'bg-slate-100 text-slate-800' : 'bg-blue-100 text-blue-800'}
-                            `}>
-                              {t.status}
-                            </span>
-                          </td>
-                          <td className="px-3.5 py-1.5 whitespace-nowrap text-slate-600 text-[11px]">
-                            <span className="font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.25 rounded text-[10px]">
-                              {t.flight_status}
-                            </span>
-                          </td>
-                          <td className="px-3.5 py-1.5 whitespace-nowrap">
-                            <TicketProgressBar ticket={t} />
-                          </td>
+                              )}
+                            </td>
+                          )}
+                          {(visibleColumns.status ?? true) && (
+                            <td className="px-3.5 py-1.5 whitespace-nowrap">
+                              {renderStatusBadge(t.status)}
+                            </td>
+                          )}
+                          {(visibleColumns.flight_status ?? true) && (
+                            <td className="px-3.5 py-1.5 whitespace-nowrap text-slate-600 text-[11px]">
+                              {renderFlightStatusBadge(t.flight_status, t.departure_date)}
+                            </td>
+                          )}
+                          {(visibleColumns.workflow ?? true) && (
+                            <td className="px-3.5 py-1.5 whitespace-nowrap">
+                              <TicketProgressBar ticket={t} />
+                            </td>
+                          )}
                           <td className="px-3.5 py-1.5 whitespace-nowrap text-right text-xs font-medium">
                             <div className="flex justify-end items-center space-x-3">
                               <button 
@@ -2671,163 +3068,155 @@ export default function Dashboard() {
                         </>
                       ) : (
                         <>
-                          <td className="px-3.5 py-1.5 w-44 min-w-[176px] max-w-[200px] whitespace-normal">
-                            <div className="flex items-start space-x-1.5 font-semibold text-slate-900 text-[11.5px] leading-tight break-words">
-                              {(t.flight_status === 'NO_SHOW' || t.rescheduled_flight_status === 'NO_SHOW') && (
-                                <span className="relative flex h-1.5 w-1.5 mt-1 shrink-0" title="No Show / Missed flight warning!">
-                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-650"></span>
-                                </span>
-                              )}
-                              <span>{t.passenger_name}</span>
-                            </div>
-                          </td>
-                          <td className="px-3.5 py-1.5 whitespace-nowrap text-slate-600 text-[11px]">{t.pp_number}</td>
-                          <td className="px-3.5 py-1.5 w-40 min-w-[160px] max-w-[185px] whitespace-normal break-words text-slate-600 text-[11px]">
-                             {
-                               Array.isArray(t.project_ids) && t.project_ids.length > 0
-                                 ? t.project_ids.map((id: string) => allProjects.find(p => p.id === id)?.name || id).join(', ')
-                                 : (allProjects.find(p => p.id === t.project_id)?.name || t.project_id || '-')
-                             }
-                            </td>
-                          <td className="px-1 py-1.5 whitespace-nowrap text-slate-600 text-[11px] font-mono">{t.route || '-'}</td>
-                          <td className="px-1 py-1.5 whitespace-nowrap text-slate-700 text-[11px] font-medium">{t.travel_agent || '-'}</td>
-                          <td className="px-3.5 py-1.5 whitespace-nowrap text-slate-600 text-[11px]">
-                            {!!(t.rescheduled_departure_date || t.other_invoice_number) ? (
-                              <div className="flex flex-col gap-0.5">
-                                <div className="flex items-center gap-1">
-                                  <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1 rounded leading-none py-0.5" title="Original Ticket Approved Cost">1st</span>
-                                  <span className="text-slate-600 font-medium">${Number(t.approved_rate || t.price || 0).toLocaleString()}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1 rounded leading-none py-0.5" title="Rescheduled Ticket Approved Cost">2nd</span>
-                                  <span className="text-slate-800 font-bold">${Number(t.rescheduled_ticket_amount || 0).toLocaleString()}</span>
-                                </div>
-                              </div>
-                            ) : (
-                              t.approved_rate ? `$${Number(t.approved_rate).toLocaleString()}` : '-'
-                            )}
-                          </td>
-                          <td className="px-3.5 py-1.5 whitespace-nowrap text-slate-600 text-[11px]">
-                            {!!(t.rescheduled_departure_date || t.other_invoice_number) ? (
-                              <div className="flex flex-col gap-1">
-                                {(t.invoice_number || t.first_invoice_number) ? (
-                                  <div className="flex items-start gap-1">
-                                    <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1 rounded leading-none mt-0.5" title="Original Invoice">1st</span>
-                                    <div>
-                                      <span className="font-mono text-slate-600 text-[11px] block leading-none">{t.invoice_number || t.first_invoice_number}</span>
-                                      {(t.invoice_amount || t.first_invoice_amount) && (
-                                        <span className="text-[10px] text-slate-500">${Number(t.invoice_amount || t.first_invoice_amount).toLocaleString()}</span>
-                                      )}
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-1 text-slate-400 italic text-[10px]">
-                                    <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1 rounded leading-none">1st</span>
-                                    -
-                                  </div>
-                                )}
-                                {t.other_invoice_number ? (
-                                  <div className="flex items-start gap-1">
-                                    <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1 rounded leading-none mt-0.5" title="Rescheduled Invoice">2nd</span>
-                                    <div>
-                                      <span className="font-mono text-slate-800 font-semibold text-[11px] block leading-none">{t.other_invoice_number}</span>
-                                      {t.rescheduled_ticket_amount && (
-                                        <span className="text-[10px] text-orange-600 font-medium">${Number(t.rescheduled_ticket_amount).toLocaleString()}</span>
-                                      )}
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-1 text-slate-400 italic text-[10px]">
-                                    <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1 rounded leading-none">2nd</span>
-                                    Pending Invoice
-                                  </div>
-                                )}
-                                {t.po_status === 'payment done' && (
-                                  <span className="inline-flex items-center w-fit px-1.5 py-0.25 rounded text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase tracking-wide mt-0.5">
-                                    ✓ Paid
+                          {(visibleColumns.passenger_name ?? true) && (
+                            <td className="px-3.5 py-1.5 w-44 min-w-[176px] max-w-[200px] whitespace-normal">
+                              <div className="flex items-start space-x-1.5 font-semibold text-slate-900 text-[11.5px] leading-tight break-words">
+                                {(t.flight_status === 'NO_SHOW' || t.rescheduled_flight_status === 'NO_SHOW') && (
+                                  <span className="relative flex h-1.5 w-1.5 mt-1 shrink-0" title="No Show / Missed flight warning!">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-650"></span>
                                   </span>
                                 )}
+                                <span>{t.passenger_name}</span>
                               </div>
-                            ) : (
-                              t.invoice_number || t.first_invoice_number ? (
-                                <div>
-                                  <span className="font-mono text-slate-800">{t.invoice_number || t.first_invoice_number}</span>
-                                  {(t.invoice_amount || t.first_invoice_amount) && (
-                                    <span className="block text-[10px] text-slate-500">${Number(t.invoice_amount || t.first_invoice_amount).toLocaleString()}</span>
+                            </td>
+                          )}
+                          {(visibleColumns.pp_number ?? true) && (
+                            <td className="px-3.5 py-1.5 whitespace-nowrap text-slate-600 text-[11px]">{t.pp_number}</td>
+                          )}
+                          {(visibleColumns.project_id ?? true) && (
+                            <td className="px-3.5 py-1.5 w-40 min-w-[160px] max-w-[185px] whitespace-normal break-words text-slate-600 text-[11px]">
+                               {
+                                 Array.isArray(t.project_ids) && t.project_ids.length > 0
+                                   ? t.project_ids.map((id: string) => allProjects.find(p => p.id === id)?.name || id).join(', ')
+                                   : (allProjects.find(p => p.id === t.project_id)?.name || t.project_id || '-')
+                               }
+                            </td>
+                          )}
+                          {(visibleColumns.route ?? true) && (
+                            <td className="px-1 py-1.5 whitespace-nowrap text-slate-600 text-[11px] font-mono">{t.route || '-'}</td>
+                          )}
+                          {(visibleColumns.ticketing_agency ?? true) && (
+                            <td className="px-1 py-1.5 whitespace-nowrap text-slate-700 text-[11px] font-medium">{t.travel_agent || '-'}</td>
+                          )}
+                          {(visibleColumns.approved_cost ?? true) && (
+                            <td className="px-3.5 py-1.5 whitespace-nowrap text-slate-600 text-[11px]">
+                              {!!(t.rescheduled_departure_date || t.other_invoice_number) ? (
+                                <div className="flex flex-col gap-0.5">
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1 rounded leading-none py-0.5" title="Original Ticket Approved Cost">1st</span>
+                                    <span className="text-slate-600 font-medium">${Number(t.approved_rate || t.price || 0).toLocaleString()}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1 rounded leading-none py-0.5" title="Rescheduled Ticket Approved Cost">2nd</span>
+                                    <span className="text-slate-800 font-bold">${Number(t.rescheduled_ticket_amount || 0).toLocaleString()}</span>
+                                  </div>
+                                </div>
+                              ) : (
+                                t.approved_rate ? `$${Number(t.approved_rate).toLocaleString()}` : '-'
+                              )}
+                            </td>
+                          )}
+                          {(visibleColumns.invoice_details ?? true) && (
+                            <td className="px-3.5 py-1.5 whitespace-nowrap text-slate-600 text-[11px]">
+                              {!!(t.rescheduled_departure_date || t.other_invoice_number) ? (
+                                <div className="flex flex-col gap-1">
+                                  {(t.invoice_number || t.first_invoice_number) ? (
+                                    <div className="flex items-start gap-1">
+                                      <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1 rounded leading-none mt-0.5" title="Original Invoice">1st</span>
+                                      <div>
+                                        <span className="font-mono text-slate-600 text-[11px] block leading-none">{t.invoice_number || t.first_invoice_number}</span>
+                                        {(t.invoice_amount || t.first_invoice_amount) && (
+                                          <span className="text-[10px] text-slate-500">${Number(t.invoice_amount || t.first_invoice_amount).toLocaleString()}</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-1 text-slate-400 italic text-[10px]">
+                                      <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1 rounded leading-none">1st</span>
+                                      -
+                                    </div>
+                                  )}
+                                  {t.other_invoice_number ? (
+                                    <div className="flex items-start gap-1">
+                                      <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1 rounded leading-none mt-0.5" title="Rescheduled Invoice">2nd</span>
+                                      <div>
+                                        <span className="font-mono text-slate-800 font-semibold text-[11px] block leading-none">{t.other_invoice_number}</span>
+                                        {t.rescheduled_ticket_amount && (
+                                          <span className="text-[10px] text-orange-600 font-medium">${Number(t.rescheduled_ticket_amount).toLocaleString()}</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-1 text-slate-400 italic text-[10px]">
+                                      <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1 rounded leading-none">2nd</span>
+                                      Pending Invoice
+                                    </div>
                                   )}
                                   {t.po_status === 'payment done' && (
-                                    <span className="inline-flex items-center px-1.5 py-0.25 rounded text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-100 mt-0.5 uppercase tracking-wide">
+                                    <span className="inline-flex items-center w-fit px-1.5 py-0.25 rounded text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase tracking-wide mt-0.5">
                                       ✓ Paid
                                     </span>
                                   )}
                                 </div>
-                              ) : '-'
-                            )}
-                          </td>
-                          <td className="px-3.5 py-1.5 whitespace-nowrap text-slate-600 text-[11px] font-mono">
-                            {!!(t.rescheduled_departure_date || t.other_invoice_number) ? (
-                              <div className="flex flex-col gap-1">
-                                <div className="flex items-center gap-1">
-                                  <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1 rounded leading-none py-0.5" title="Original PO">1st</span>
-                                  <span className="font-mono text-slate-600">{t.po_number || 'Pending'}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1 rounded leading-none py-0.5" title="Rescheduled PO">2nd</span>
-                                  <span className="font-mono text-slate-800 font-semibold">{t.other_po_number || 'Pending'}</span>
-                                </div>
-                                {t.po_status === 'payment done' && (
-                                  <span className="block text-[9px] font-black uppercase text-emerald-700 bg-emerald-50 px-1 py-0.25 rounded border border-emerald-200 w-fit leading-none mt-0.5">Paid</span>
-                                )}
-                              </div>
-                            ) : (
-                              <div>
-                                <span>{t.po_number || '-'}</span>
-                                {t.po_status === 'payment done' && (
-                                  <span className="block text-[9px] font-black uppercase text-emerald-700 bg-emerald-50 px-1 py-0.25 rounded border border-emerald-200 mt-0.5 w-fit">Paid</span>
-                                )}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-3.5 py-1.5 whitespace-nowrap">
-                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold
-                              ${t.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : 
-                                t.status === 'DRAFT' ? 'bg-slate-100 text-slate-800' : 'bg-blue-100 text-blue-800'}
-                            `}>
-                              {t.status}
-                            </span>
-                          </td>
-                          <td className="px-3.5 py-1.5 whitespace-nowrap">
-                            {(!t.flight_status || t.flight_status === 'PENDING') ? (
-                              t.departure_date && t.departure_date < format(new Date(), 'yyyy-MM-dd') ? (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-red-650 border border-red-200/60 leading-none select-none">
-                                  <AlertCircle className="w-3 h-3 mr-1 text-red-500" /> Update Required
-                                </span>
                               ) : (
-                                <span className="text-slate-400 italic text-[11px] leading-none select-none">Pending</span>
-                              )
-                            ) : (
-                              t.flight_status === 'NO_SHOW' ? (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border border-red-200 bg-red-50 text-red-700 leading-none select-none">
-                                  <span className="relative flex h-1 w-1 mr-1 animate-pulse">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-1 w-1 bg-red-600"></span>
-                                  </span>
-                                  no-show
-                                </span>
+                                t.invoice_number || t.first_invoice_number ? (
+                                  <div>
+                                    <span className="font-mono text-slate-800">{t.invoice_number || t.first_invoice_number}</span>
+                                    {(t.invoice_amount || t.first_invoice_amount) && (
+                                      <span className="block text-[10px] text-slate-500">${Number(t.invoice_amount || t.first_invoice_amount).toLocaleString()}</span>
+                                    )}
+                                    {t.po_status === 'payment done' && (
+                                      <span className="inline-flex items-center px-1.5 py-0.25 rounded text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-100 mt-0.5 uppercase tracking-wide">
+                                        ✓ Paid
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : '-'
+                              )}
+                            </td>
+                          )}
+                          {(visibleColumns.po_number ?? true) && (
+                            <td className="px-3.5 py-1.5 whitespace-nowrap text-slate-600 text-[11px] font-mono">
+                              {!!(t.rescheduled_departure_date || t.other_invoice_number) ? (
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1 rounded leading-none py-0.5" title="Original PO">1st</span>
+                                    <span className="font-mono text-slate-600">{t.po_number || 'Pending'}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1 rounded leading-none py-0.5" title="Rescheduled PO">2nd</span>
+                                    <span className="font-mono text-slate-800 font-semibold">{t.other_po_number || 'Pending'}</span>
+                                  </div>
+                                  {t.po_status === 'payment done' && (
+                                    <span className="block text-[9px] font-black uppercase text-emerald-700 bg-emerald-50 px-1 py-0.25 rounded border border-emerald-200 w-fit leading-none mt-0.5">Paid</span>
+                                  )}
+                                </div>
                               ) : (
-                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border capitalize leading-none select-none ${
-                                  t.flight_status === 'DEPARTED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                                  'bg-sky-50 text-sky-700 border-sky-200'
-                                }`}>
-                                  {t.flight_status.toLowerCase()}
-                                </span>
-                              )
-                            )}
-                          </td>
-                          <td className="px-3.5 py-1.5 whitespace-nowrap">
-                            <TicketProgressBar ticket={t} />
-                          </td>
+                                <div>
+                                  <span>{t.po_number || '-'}</span>
+                                  {t.po_status === 'payment done' && (
+                                    <span className="block text-[9px] font-black uppercase text-emerald-700 bg-emerald-50 px-1 py-0.25 rounded border border-emerald-200 mt-0.5 w-fit">Paid</span>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                          )}
+                          {(visibleColumns.status ?? true) && (
+                            <td className="px-3.5 py-1.5 whitespace-nowrap">
+                              {renderStatusBadge(t.status)}
+                            </td>
+                          )}
+                          {(visibleColumns.flight_status ?? true) && (
+                            <td className="px-3.5 py-1.5 whitespace-nowrap">
+                              {renderFlightStatusBadge(t.flight_status, t.departure_date)}
+                            </td>
+                          )}
+                          {(visibleColumns.workflow ?? true) && (
+                            <td className="px-3.5 py-1.5 whitespace-nowrap">
+                              <TicketProgressBar ticket={t} />
+                            </td>
+                          )}
                           <td className="px-3.5 py-1.5 whitespace-nowrap text-right text-xs font-medium">
                             <div className="flex justify-end items-center space-x-3">
                               {role !== 'FINANCE' && t.status !== 'COMPLETED' && (() => {
