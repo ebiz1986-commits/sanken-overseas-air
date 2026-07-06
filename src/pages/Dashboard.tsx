@@ -2268,7 +2268,7 @@ export default function Dashboard() {
                   {activeTab === 'ALL_TICKETS' && (allTicketsSubTab === 'MISSED' || allTicketsSubTab === 'DANGER_ZONE') ? (
                     <>
                       <th className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Date of first scheduled flight</th>
-                      <th className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Project</th>
+                      <th className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider w-40 min-w-[160px] max-w-[185px] whitespace-normal">Project</th>
                       <th className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider w-44 min-w-[176px] max-w-[200px]">Name</th>
                       <th className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Passport Number</th>
                       <th className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Designation</th>
@@ -2287,7 +2287,7 @@ export default function Dashboard() {
                       <th onClick={() => handleSort('passenger_name')} className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none w-44 min-w-[176px] max-w-[200px]">Passenger {sortKey === 'passenger_name' && (sortDir === 'asc' ? '↑' : '↓')}</th>
                       <th onClick={() => handleSort('pp_number')} className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none">PP Number {sortKey === 'pp_number' && (sortDir === 'asc' ? '↑' : '↓')}</th>
                       <th className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Attached Image(s)</th>
-                      <th onClick={() => handleSort('project_id')} className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none">Project {sortKey === 'project_id' && (sortDir === 'asc' ? '↑' : '↓')}</th>
+                      <th onClick={() => handleSort('project_id')} className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none w-40 min-w-[160px] max-w-[185px] whitespace-normal">Project {sortKey === 'project_id' && (sortDir === 'asc' ? '↑' : '↓')}</th>
                       <th className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Route</th>
                       <th className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Ticketing Agency</th>
                       <th className="px-2 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Approved Cost</th>
@@ -2302,7 +2302,7 @@ export default function Dashboard() {
                     <>
                       <th onClick={() => handleSort('passenger_name')} className="px-3 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none w-44 min-w-[176px] max-w-[200px]">Passenger {sortKey === 'passenger_name' && (sortDir === 'asc' ? '↑' : '↓')}</th>
                       <th onClick={() => handleSort('pp_number')} className="px-3 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none">PP Number {sortKey === 'pp_number' && (sortDir === 'asc' ? '↑' : '↓')}</th>
-                      <th onClick={() => handleSort('project_id')} className="px-3 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none">Project {sortKey === 'project_id' && (sortDir === 'asc' ? '↑' : '↓')}</th>
+                      <th onClick={() => handleSort('project_id')} className="px-3 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 select-none w-40 min-w-[160px] max-w-[185px] whitespace-normal">Project {sortKey === 'project_id' && (sortDir === 'asc' ? '↑' : '↓')}</th>
                       <th className="px-1 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Route</th>
                       <th className="px-1 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Ticketing Agency</th>
                       <th className="px-3 py-1.5 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Approved Cost</th>
@@ -2364,7 +2364,7 @@ export default function Dashboard() {
                       {activeTab === 'ALL_TICKETS' && (allTicketsSubTab === 'MISSED' || allTicketsSubTab === 'DANGER_ZONE') ? (
                         <>
                           <td className="px-3.5 py-1.5 whitespace-nowrap text-[11px] text-slate-600">{t.departure_date ? new Date(t.departure_date).toLocaleDateString() : '-'}</td>
-                          <td className="px-3.5 py-1.5 whitespace-nowrap text-[11px] text-slate-600">
+                          <td className="px-3.5 py-1.5 w-40 min-w-[160px] max-w-[185px] whitespace-normal break-words text-[11px] text-slate-600">
                             {
                               Array.isArray(t.project_ids) && t.project_ids.length > 0
                                 ? t.project_ids.map((id: string) => allProjects.find(p => p.id === id)?.name || id).join(', ')
@@ -2523,7 +2523,7 @@ export default function Dashboard() {
                             </div>
                           </td>
 
-                          <td className="px-3.5 py-1.5 whitespace-nowrap text-slate-600 text-[11px]">
+                          <td className="px-3.5 py-1.5 w-40 min-w-[160px] max-w-[185px] whitespace-normal break-words text-slate-600 text-[11px]">
                             {
                               Array.isArray(t.project_ids) && t.project_ids.length > 0
                                 ? t.project_ids.map((id: string) => allProjects.find(p => p.id === id)?.name || id).join(', ')
@@ -2672,7 +2672,7 @@ export default function Dashboard() {
                             </div>
                           </td>
                           <td className="px-3.5 py-1.5 whitespace-nowrap text-slate-600 text-[11px]">{t.pp_number}</td>
-                          <td className="px-3.5 py-1.5 whitespace-nowrap text-slate-600 text-[11px]">
+                          <td className="px-3.5 py-1.5 w-40 min-w-[160px] max-w-[185px] whitespace-normal break-words text-slate-600 text-[11px]">
                              {
                                Array.isArray(t.project_ids) && t.project_ids.length > 0
                                  ? t.project_ids.map((id: string) => allProjects.find(p => p.id === id)?.name || id).join(', ')
