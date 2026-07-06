@@ -11,6 +11,7 @@ import NewTicketModal from '../components/NewTicketModal';
 import UpdateFlightStatusModal from '../components/UpdateFlightStatusModal';
 import ConfirmationModal from '../components/ConfirmationModal';
 import PoStatusDashboard from '../components/PoStatusDashboard';
+import DonutChart from '../components/DonutChart';
 
 export const isPdfUrl = (url: string | null): boolean => {
   if (!url) return false;
@@ -1327,11 +1328,14 @@ export default function Dashboard() {
             transition={{ duration: 0.4 }}
             className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col h-full min-h-[220px]"
           >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[12px] font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>
-                Workflow Status
-              </h3>
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <h3 className="text-[12px] font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>
+                  Workflow Status
+                </h3>
+                <p className="text-[10px] text-slate-500 mt-0.5">Real-time pipeline orchestration.</p>
+              </div>
               <span className="text-[10px] font-semibold text-emerald-600 uppercase tracking-widest bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
                 Live
               </span>
@@ -1372,17 +1376,20 @@ export default function Dashboard() {
             transition={{ duration: 0.4, delay: 0.1 }}
             className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col h-full min-h-[220px]"
           >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[12px] font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                <Users className="w-4 h-4 text-emerald-500" />
-                Ticketing Agents
-              </h3>
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <h3 className="text-[12px] font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                  <Users className="w-4 h-4 text-emerald-500" />
+                  Ticketing Agents
+                </h3>
+                <p className="text-[10px] text-slate-500 mt-0.5">Performance & volume overview.</p>
+              </div>
             </div>
             
             <div className="space-y-2 flex-1 overflow-y-auto">
               {agentAccumulatedStats.map(({ agent, count, cost }, idx) => (
                 <div 
-                  key={agent}
+                  key={`${agent}-${idx}`}
                   className="flex items-center justify-between bg-slate-50 border border-slate-100 p-3 rounded-xl"
                 >
                   <span className="text-sm font-bold text-slate-700 truncate" title={agent}>{agent}</span>
@@ -1422,10 +1429,14 @@ export default function Dashboard() {
                 <span className="text-[9px] font-extrabold text-slate-450 uppercase tracking-wider mb-1">Passengers</span>
                 <span className="text-xl font-black text-slate-900 leading-none">{dashboardTopSummary.passengersCount}</span>
               </div>
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3 flex flex-col justify-center">
+              <motion.div 
+                initial={false}
+                animate={dashboardTopSummary.noShowCount > 0 ? { borderColor: '#fecaca' } : { borderColor: '#e2e8f0' }}
+                className={`bg-white rounded-xl shadow-sm border p-3 flex flex-col justify-center ${dashboardTopSummary.noShowCount > 0 ? 'animate-pulse-glowing-red' : ''}`}
+              >
                 <span className="text-[9px] font-extrabold text-slate-450 uppercase tracking-wider mb-1">No Shows</span>
-                <span className="text-xl font-black text-slate-900 leading-none">{dashboardTopSummary.noShowCount}</span>
-              </div>
+                <span className={`text-xl font-black ${dashboardTopSummary.noShowCount > 0 ? 'text-red-600' : 'text-slate-900'} leading-none`}>{dashboardTopSummary.noShowCount}</span>
+              </motion.div>
             </div>
           </div>
 
@@ -1579,29 +1590,14 @@ export default function Dashboard() {
             {/* Charts Section */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
               <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 lg:col-span-1">
-                <h3 className="text-lg font-semibold text-slate-900 mb-4">Flight Status Breakdown</h3>
-                <div className="h-64">
-                  {flightData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={flightData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={80}
-                          fill="#8884d8"
-                          paddingAngle={5}
-                          dataKey="value"
-                        >
-                          {flightData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <RechartsTooltip />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Ticket Status Breakdown</h3>
+                <div className="h-64 flex items-center justify-center">
+                  {dashboardTopSummary.statusCounts ? (
+                    <DonutChart data={dashboardTopSummary.statusCounts as Record<string, number>} colors={{
+                      'COMPLETED': '#10b981',
+                      'DRAFT': '#94a3b8',
+                      'IN_PROGRESS': '#3b82f6'
+                    }} />
                   ) : (
                     <div className="flex items-center justify-center h-full text-slate-400">No data available</div>
                   )}

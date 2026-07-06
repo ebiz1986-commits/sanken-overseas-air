@@ -35,4 +35,24 @@
   --color-brand-text-strong: #0f172a;   /* Crisper header text */
 }
 
+@keyframes pulse-glowing-red {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 4px rgba(239, 68, 68, 0.4);
+    border-color: rgba(239, 68, 68, 0.4);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 14px rgba(239, 68, 68, 0.855);
+    border-color: rgba(239, 68, 68, 1);
+    background-color: rgba(254, 226, 226, 0.3);
+    opacity: 0.95;
+  }
+}
+
+.animate-pulse-glowing-red {
+  animation: pulse-glowing-red 2s infinite ease-in-out;
+}
+
 
