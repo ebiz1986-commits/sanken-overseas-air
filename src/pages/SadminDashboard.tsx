@@ -291,7 +291,7 @@ export default function SadminDashboard() {
     return Array.from({ length: 15 }).map((_, idx) => {
       const actualCost = 65000 + (idx * 12000);
       const allowance = 80000 + ((idx % 3) * 10000);
-      const projectId = idx % 3 === 0 ? 'PROJ-SEY' : (idx % 3 === 1 ? 'PROJ-MLD' : 'PROJ-DXB');
+      const projectId = projectsList.length > 0 ? projectsList[idx % projectsList.length].id : 'GENERAL';
       return {
         id: `WRK-26${idx.toString().padStart(2, '0')}`,
         worker_name: names[idx % names.length],
@@ -304,7 +304,7 @@ export default function SadminDashboard() {
         status: idx === 14 ? 'Cancelled' : (idx > 10 ? 'Completed' : 'Active')
       };
     });
-  }, []);
+  }, [projectsList]);
 
   // ---------------------------------------------------------
   // Real Firestore Data Loader + Mock Fallback Seed Match
@@ -370,14 +370,6 @@ export default function SadminDashboard() {
         code: (p.id || '').substring(0, 8) || p.code || 'PROJ',
         budget_allocated: Number(p.budget_allocated || p.budget) || 500000
       }));
-
-      if (finalProjects.length === 0) {
-        finalProjects = [
-          { id: 'PROJ-MLD', name: 'Maldives Resort Proj', code: 'PRJ-MLD', budget_allocated: 1200000 },
-          { id: 'PROJ-DXB', name: 'Dubai Expo Pavilion', code: 'PRJ-DXB', budget_allocated: 2000000 },
-          { id: 'PROJ-SEY', name: 'Seychelles Airport', code: 'PRJ-SEY', budget_allocated: 1500000 }
-        ];
-      }
 
       setAllTickets(parsedTickets);
       setProjectsList(finalProjects);
@@ -1043,15 +1035,17 @@ export default function SadminDashboard() {
   }, [allTickets]);
 
   const projectsListWithSpent = useMemo(() => {
-    return projectsList.map(p => {
-      const spent = allTickets
-        .filter(t => t.project_id === p.id)
-        .reduce((sum, t) => sum + (Number(t.approved_rate) || Number(t.price) || Number(t.invoice_amount) || 0), 0);
-      return {
-        ...p,
-        spent: spent
-      };
-    });
+    return projectsList
+      .map(p => {
+        const spent = allTickets
+          .filter(t => t.project_id === p.id)
+          .reduce((sum, t) => sum + (Number(t.approved_rate) || Number(t.price) || Number(t.invoice_amount) || 0), 0);
+        return {
+          ...p,
+          spent: spent
+        };
+      })
+      .filter(p => (Number(p.budget_allocated) || Number(p.budget) || 0) > 0 || p.spent > 0);
   }, [projectsList, allTickets]);
 
   const managerSecondaryStats = useMemo(() => {

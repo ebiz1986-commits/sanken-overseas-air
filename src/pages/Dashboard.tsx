@@ -797,7 +797,8 @@ export default function Dashboard() {
       ]);
       setMetrics(m?.data || null);
       setFlightStatus(f?.data || {});
-      setProjects(p?.data?.projects || []);
+      const projData = (p?.data?.projects || []).filter((proj: any) => proj.budget > 0 || proj.spent > 0 || proj.pending > 0);
+      setProjects(projData);
       setCompanies(p?.data?.companies || []);
       setTickets(t?.data?.tickets || []);
       setOptions(o?.data || []);
