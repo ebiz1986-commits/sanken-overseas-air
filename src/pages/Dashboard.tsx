@@ -3,7 +3,7 @@ import api from '../api';
 import toast from 'react-hot-toast';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import { useAuthStore } from '../store';
-import { LogOut, Plus, Search, Download, AlertCircle, AlertTriangle, X, Upload, Image, Eye, Trash2, LayoutGrid, List, FileText, File, ExternalLink, ChevronDown, ChevronUp, Users, Award, TrendingUp, SlidersHorizontal, RefreshCw } from 'lucide-react';
+import { LogOut, Plus, Search, Download, AlertCircle, AlertTriangle, X, Upload, Image, Eye, Trash2, LayoutGrid, List, FileText, File, ExternalLink, ChevronDown, ChevronUp, Users, Award, TrendingUp, SlidersHorizontal, RefreshCw, Calendar, Plane } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -747,6 +747,113 @@ export default function Dashboard() {
       count: data.count,
       cost: data.cost
     })).sort((a, b) => b.cost - a.cost);
+  }, [tickets]);
+
+  const monthlyRouteStats = useMemo(() => {
+    const monthsData: Record<string, {
+      totalCount: number;
+      businessCount: number;
+      economyCount: number;
+      routes: Record<string, {
+        business: { USD: { sum: number; count: number }; LKR: { sum: number; count: number } };
+        economy: { USD: { sum: number; count: number }; LKR: { sum: number; count: number } };
+        all: { USD: { sum: number; count: number }; LKR: { sum: number; count: number } };
+      }>;
+    }> = {};
+
+    const normalizeRouteStr = (r: string) => {
+      if (!r) return '';
+      return r.toUpperCase().replace(/\s+/g, '').replace(/->/g, '-').replace(/=>/g, '-').replace(/\//g, '-');
+    };
+
+    const targetRouteKeys = ['CMB-MLE', 'CMB-MLE-CMB', 'MLE-CMB', 'MLE-CMB-MLE'];
+
+    (tickets || []).forEach(t => {
+      if (!t) return;
+      
+      const d = t.departure_date || t.ticket_arranged_date || t.created_at || t.stage3_completed_at;
+      let monthLabel = 'No Specified Month';
+      if (d) {
+        try {
+          const date = new Date(d);
+          if (!isNaN(date.getTime())) {
+            monthLabel = date.toLocaleString('default', { month: 'long', year: 'numeric' });
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      if (!monthsData[monthLabel]) {
+        monthsData[monthLabel] = {
+          totalCount: 0,
+          businessCount: 0,
+          economyCount: 0,
+          routes: {}
+        };
+        // Initialize routes
+        targetRouteKeys.forEach(k => {
+          monthsData[monthLabel].routes[k] = {
+            business: { USD: { sum: 0, count: 0 }, LKR: { sum: 0, count: 0 } },
+            economy: { USD: { sum: 0, count: 0 }, LKR: { sum: 0, count: 0 } },
+            all: { USD: { sum: 0, count: 0 }, LKR: { sum: 0, count: 0 } }
+          };
+        });
+      }
+
+      const isLKR = t.currency === 'LKR';
+      const cost = Number(t.approved_rate) || Number(t.invoice_amount) || Number(t.price) || Number(t.other_invoice_amount) || 0;
+      
+      const typeStr = String(t.ticket_type || '').toUpperCase();
+      const jobStr = String(t.job_category || '').toUpperCase();
+      const classStr = String(t.ticket_class || '').toUpperCase();
+      const isBusiness = typeStr.includes('BUSINESS') || classStr.includes('BUSINESS') || jobStr.includes('BUSINESS');
+
+      // Update counters
+      monthsData[monthLabel].totalCount++;
+      if (isBusiness) {
+        monthsData[monthLabel].businessCount++;
+      } else {
+        monthsData[monthLabel].economyCount++;
+      }
+
+      const rawRoute = t.route || '';
+      const normRoute = normalizeRouteStr(rawRoute);
+
+      if (targetRouteKeys.includes(normRoute)) {
+        const routeData = monthsData[monthLabel].routes[normRoute];
+        
+        if (cost > 0) {
+          if (isLKR) {
+            routeData.all.LKR.sum += cost;
+            routeData.all.LKR.count++;
+          } else {
+            routeData.all.USD.sum += cost;
+            routeData.all.USD.count++;
+          }
+
+          if (isBusiness) {
+            if (isLKR) {
+              routeData.business.LKR.sum += cost;
+              routeData.business.LKR.count++;
+            } else {
+              routeData.business.USD.sum += cost;
+              routeData.business.USD.count++;
+            }
+          } else {
+            if (isLKR) {
+              routeData.economy.LKR.sum += cost;
+              routeData.economy.LKR.count++;
+            } else {
+              routeData.economy.USD.sum += cost;
+              routeData.economy.USD.count++;
+            }
+          }
+        }
+      }
+    });
+
+    return monthsData;
   }, [tickets]);
 
   const handleOpenErpPrepModal = (
@@ -1984,6 +2091,156 @@ export default function Dashboard() {
               </div>
 
             </div>
+
+            {/* Monthly Route Average & Ticket Volume Analysis */}
+            <motion.div 
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.2 }}
+              className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mt-8"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <Plane className="w-5 h-5 text-sky-500" />
+                    Monthly Route Average & Ticket Volume Analysis
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Sector-by-sector ticket analysis showing per-head average fares (Economy vs. Business) and monthly totals.
+                  </p>
+                </div>
+              </div>
+
+              {(() => {
+                const sortedAnalyticMonths = Object.keys(monthlyRouteStats).sort((a, b) => {
+                  if (a === 'No Specified Month') return 1;
+                  if (b === 'No Specified Month') return -1;
+                  try {
+                    return new Date(a).getTime() - new Date(b).getTime();
+                  } catch {
+                    return 0;
+                  }
+                });
+
+                if (sortedAnalyticMonths.length === 0) {
+                  return (
+                    <div className="text-center text-sm text-slate-400 py-8">
+                      No ticket data available to perform route analysis.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-6">
+                    {sortedAnalyticMonths.map((month) => {
+                      const monthData = monthlyRouteStats[month];
+                      return (
+                        <div key={month} className="bg-slate-50/55 rounded-xl border border-slate-200/60 p-5">
+                          {/* Month Header and Overall counters */}
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-slate-200/60 pb-3">
+                            <div className="flex items-center gap-2">
+                              <Calendar className="w-4 h-4 text-slate-500" />
+                              <span className="font-extrabold text-slate-900 text-sm">{month}</span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="bg-slate-200/60 text-slate-700 text-[10.5px] font-bold px-2.5 py-1 rounded-lg border border-slate-300/40">
+                                Total: <strong className="text-slate-900">{monthData.totalCount}</strong> tickets
+                              </span>
+                              {monthData.businessCount > 0 && (
+                                <span className="bg-amber-50 text-amber-700 text-[10.5px] font-bold px-2.5 py-1 rounded-lg border border-amber-200/60 flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                  Business: <strong className="text-amber-900">{monthData.businessCount}</strong>
+                                </span>
+                              )}
+                              <span className="bg-sky-50 text-sky-700 text-[10.5px] font-bold px-2.5 py-1 rounded-lg border border-sky-100 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
+                                Economy: <strong className="text-sky-900">{monthData.economyCount}</strong>
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Route Grid */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {[
+                              { key: 'CMB-MLE', label: 'CMB - MLE' },
+                              { key: 'CMB-MLE-CMB', label: 'CMB - MLE - CMB' },
+                              { key: 'MLE-CMB', label: 'MLE - CMB' },
+                              { key: 'MLE-CMB-MLE', label: 'MLE - CMB - MLE' }
+                            ].map((routeDef) => {
+                              const rData = monthData.routes[routeDef.key];
+                              
+                              // Format averages helper
+                              const renderFareDetails = (dataGroup: { USD: { sum: number; count: number }; LKR: { sum: number; count: number } }) => {
+                                const fares: string[] = [];
+                                if (dataGroup.USD.count > 0) {
+                                  const avg = dataGroup.USD.sum / dataGroup.USD.count;
+                                  fares.push(`$${avg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${dataGroup.USD.count} tkt)`);
+                                }
+                                if (dataGroup.LKR.count > 0) {
+                                  const avg = dataGroup.LKR.sum / dataGroup.LKR.count;
+                                  fares.push(`LKR ${avg.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} (${dataGroup.LKR.count} tkt)`);
+                                }
+                                if (fares.length === 0) return <span className="text-slate-400 font-medium italic text-[11px]">No flights</span>;
+                                return (
+                                  <div className="space-y-1">
+                                    {fares.map((f, idx) => (
+                                      <span key={idx} className="block text-slate-800 font-bold text-xs font-mono">{f}</span>
+                                    ))}
+                                  </div>
+                                );
+                              };
+
+                              const hasBusiness = rData.business.USD.count > 0 || rData.business.LKR.count > 0;
+                              const hasEconomy = rData.economy.USD.count > 0 || rData.economy.LKR.count > 0;
+                              const hasAny = rData.all.USD.count > 0 || rData.all.LKR.count > 0;
+
+                              return (
+                                <div key={routeDef.key} className="bg-white rounded-xl border border-slate-200 p-4 shadow-3xs flex flex-col justify-between hover:border-sky-200 transition-colors">
+                                  <div>
+                                    <div className="flex items-center justify-between gap-1 border-b border-slate-100 pb-2 mb-2.5">
+                                      <h4 className="text-xs font-extrabold text-slate-700 tracking-wide">{routeDef.label}</h4>
+                                      <span className="text-[9px] bg-slate-100 text-slate-500 font-semibold px-1.5 py-0.5 rounded font-mono">Sector</span>
+                                    </div>
+
+                                    {/* Business and Economy Rows */}
+                                    <div className="space-y-3">
+                                      {/* Economy Class */}
+                                      <div className="flex justify-between items-start">
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Economy:</span>
+                                        <div className="text-right">
+                                          {renderFareDetails(rData.economy)}
+                                        </div>
+                                      </div>
+
+                                      {/* Business Class */}
+                                      {(hasBusiness || !hasAny) && (
+                                        <div className="flex justify-between items-start pt-2 border-t border-slate-100/60">
+                                          <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider mt-0.5">Business:</span>
+                                          <div className="text-right">
+                                            {renderFareDetails(rData.business)}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="mt-3.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[9.5px] text-slate-400 font-medium">
+                                    <span>Sector Total:</span>
+                                    <span className="font-extrabold text-slate-600 font-mono">
+                                      {rData.all.USD.count + rData.all.LKR.count} tkts
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </motion.div>
 
             {/* Project Budget Health Cards Section */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mt-8">
