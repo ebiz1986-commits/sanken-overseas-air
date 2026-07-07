@@ -2301,9 +2301,11 @@ export default function Dashboard() {
               const docs = getTicketDocuments(t);
               return (
                 <div key={`${t.id}-${idx}`} className={`p-4 transition-colors cursor-pointer border-l-4 ${
-                  t.flight_status === 'NO_SHOW' || t.rescheduled_flight_status === 'NO_SHOW'
-                    ? 'bg-red-50/40 hover:bg-red-50 border-red-550'
-                    : 'bg-white hover:bg-slate-50 border-transparent'
+                  activeTab === 'ALL_TICKETS' && allTicketsSubTab === 'INVOICE_PENDING' && ['NO_SHOW', 'CANCELLED', 'RESCHEDULED'].includes(t.flight_status) && (!t.other_invoice_number || !t.other_invoice_number.trim())
+                    ? 'animate-pulse-glowing-amber border-amber-600'
+                    : t.flight_status === 'NO_SHOW' || t.rescheduled_flight_status === 'NO_SHOW'
+                      ? 'bg-red-50/40 hover:bg-red-50 border-red-550'
+                      : 'bg-white hover:bg-slate-50 border-transparent'
                 }`} onClick={() => navigate(`/tickets/${t.id}`)}>
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="font-semibold text-slate-900 text-sm flex items-center space-x-1.5">
@@ -2655,8 +2657,13 @@ export default function Dashboard() {
                     <React.Fragment key={`${t.id}-${idx}`}>
                     <tr 
                       className={`transition-all duration-150 border-l-4 hover:shadow-[0_2px_8px_-1px_rgba(0,0,0,0.06)] hover:bg-slate-50/95 relative ${
-                        activeTab === 'ALL_TICKETS' && allTicketsSubTab === 'INVOICE_PENDING' ? 'bg-amber-50/15 hover:bg-amber-50/25 border-amber-500' :
-                        activeTab === 'ALL_TICKETS' && (allTicketsSubTab === 'MISSED' || allTicketsSubTab === 'DANGER_ZONE') ? 'cursor-pointer bg-red-50/15 hover:bg-red-50/30 border-red-500 focus:outline-none focus:bg-red-50/25' : 'hover:bg-slate-50/80 border-transparent'
+                        activeTab === 'ALL_TICKETS' && allTicketsSubTab === 'INVOICE_PENDING' 
+                          ? (['NO_SHOW', 'CANCELLED', 'RESCHEDULED'].includes(t.flight_status) && (!t.other_invoice_number || !t.other_invoice_number.trim())
+                            ? 'animate-pulse-glowing-amber border-amber-600'
+                            : 'bg-amber-50/15 hover:bg-amber-50/25 border-amber-500')
+                          : activeTab === 'ALL_TICKETS' && (allTicketsSubTab === 'MISSED' || allTicketsSubTab === 'DANGER_ZONE') 
+                            ? 'cursor-pointer bg-red-50/15 hover:bg-red-50/30 border-red-500 focus:outline-none focus:bg-red-50/25' 
+                            : 'hover:bg-slate-50/80 border-transparent'
                       }`} 
                       onClick={() => (activeTab === 'ALL_TICKETS' && (allTicketsSubTab === 'MISSED' || allTicketsSubTab === 'DANGER_ZONE')) && setExpandedTicketId(expandedTicketId === t.id ? null : t.id)}
                       onKeyDown={(e) => {

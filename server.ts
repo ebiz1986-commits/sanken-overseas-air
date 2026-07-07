@@ -1477,6 +1477,14 @@ app.put("/api/tickets/:id/documents", authenticateToken, async (req: any, res: a
     if (first_invoice_number !== undefined) updateData.first_invoice_number = first_invoice_number;
     if (other_invoice_number !== undefined) updateData.other_invoice_number = other_invoice_number;
 
+    const mergedFlightStatus = ticket?.flight_status;
+    if (['NO_SHOW', 'CANCELLED', 'RESCHEDULED'].includes(mergedFlightStatus)) {
+      const mergedInvoiceNumber = other_invoice_number !== undefined ? other_invoice_number : (ticket?.other_invoice_number || '');
+      const isCompletedNow = !!(mergedInvoiceNumber && mergedInvoiceNumber.trim());
+      updateData.stage2_completed = isCompletedNow;
+      updateData.stage2_completed_at = isCompletedNow ? (ticket?.stage2_completed_at || admin.firestore.FieldValue.serverTimestamp()) : null;
+    }
+
     if (checkTicketSizeLimit(ticket, updateData)) {
       return res.status(400).json({ error: "Attachments are too large. The combined size of all files on this ticket exceeds Firestore's 1MB limit. Please upload smaller or compressed PDFs/images." });
     }
@@ -1685,10 +1693,16 @@ app.put("/api/tickets/:id/stage2", authenticateToken, async (req: any, res: any)
     }
 
     const u = req.body;
+    const isSecondAttemptActive = ['NO_SHOW', 'CANCELLED', 'RESCHEDULED'].includes(u.flight_status || ticket?.flight_status);
+    const invoiceNumber = u.other_invoice_number !== undefined ? u.other_invoice_number : (ticket?.other_invoice_number || '');
+    const isStage2Completed = isSecondAttemptActive 
+      ? !!(invoiceNumber && invoiceNumber.trim())
+      : true;
+
     const updateData: any = {
       ...u,
-      stage2_completed: true,
-      stage2_completed_at: admin.firestore.FieldValue.serverTimestamp(),
+      stage2_completed: isStage2Completed,
+      stage2_completed_at: isStage2Completed ? (ticket?.stage2_completed_at || admin.firestore.FieldValue.serverTimestamp()) : null,
       status: ticket?.stage3_completed ? (ticket.status || 'COMPLETED') : 'IN_PROGRESS',
       updated_by_user_id: req.user.sub,
       updated_at: admin.firestore.FieldValue.serverTimestamp()

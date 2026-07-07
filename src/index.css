@@ -55,4 +55,21 @@
   animation: pulse-glowing-red 2s infinite ease-in-out;
 }
 
+@keyframes pulse-glowing-amber {
+  0%, 100% {
+    background-color: rgba(254, 243, 199, 0.45);
+    border-color: #f59e0b;
+    box-shadow: inset 4px 0 0 #f59e0b;
+  }
+  50% {
+    background-color: rgba(254, 226, 226, 0.7);
+    border-color: #ef4444;
+    box-shadow: inset 4px 0 0 #ef4444, 0 0 10px rgba(239, 68, 68, 0.35);
+  }
+}
+
+.animate-pulse-glowing-amber {
+  animation: pulse-glowing-amber 1.8s infinite ease-in-out;
+}
+
 
