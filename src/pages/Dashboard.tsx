@@ -641,6 +641,8 @@ export default function Dashboard() {
     let invoicePendingLKR = 0;
     let poPendingUSD = 0;
     let poPendingLKR = 0;
+    let invoicePendingCount = 0;
+    let poPendingCount = 0;
     
     const invoicePendingByAgent: Record<string, { USD: number; LKR: number }> = {};
     const poPendingByAgent: Record<string, { USD: number; LKR: number }> = {};
@@ -649,6 +651,7 @@ export default function Dashboard() {
       const isLKR = t.currency === 'LKR';
       const agent = (t.travel_agent && String(t.travel_agent).trim()) || 'No Agency';
 
+      let isInvPending = false;
       if (isInvoicePending(t)) {
         const isFirstPending = !t.first_invoice_number || !t.first_invoice_number.trim();
         const isSecondActive = ['NO_SHOW', 'CANCELLED', 'RESCHEDULED'].includes(t.flight_status);
@@ -663,6 +666,7 @@ export default function Dashboard() {
         }
 
         if (amt > 0) {
+          isInvPending = true;
           if (isLKR) {
             invoicePendingLKR += amt;
             if (!invoicePendingByAgent[agent]) invoicePendingByAgent[agent] = { USD: 0, LKR: 0 };
@@ -673,6 +677,9 @@ export default function Dashboard() {
             invoicePendingByAgent[agent].USD += amt;
           }
         }
+      }
+      if (isInvPending) {
+        invoicePendingCount++;
       }
 
       const isFirstPoPending = t.first_invoice_number && t.first_invoice_number.trim() && t.po_status !== 'payment done';
@@ -687,6 +694,7 @@ export default function Dashboard() {
       }
 
       if (poAmt > 0) {
+        poPendingCount++;
         if (isLKR) {
           poPendingLKR += poAmt;
           if (!poPendingByAgent[agent]) poPendingByAgent[agent] = { USD: 0, LKR: 0 };
@@ -705,7 +713,9 @@ export default function Dashboard() {
       poPendingUSD,
       poPendingLKR,
       invoicePendingByAgent,
-      poPendingByAgent
+      poPendingByAgent,
+      invoicePendingCount,
+      poPendingCount
     };
   }, [tickets]);
 
@@ -1592,7 +1602,12 @@ export default function Dashboard() {
               {/* Invoice Pending */}
               <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-2.5 flex flex-col justify-between min-h-[115px] col-span-1">
                 <div>
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5 block">Invoice Pending</span>
+                  <div className="flex justify-between items-start mb-1">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Invoice Pending</span>
+                    <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.25 rounded-full leading-none">
+                      {financialSummary.invoicePendingCount}
+                    </span>
+                  </div>
                   <div className="flex flex-col gap-0.5">
                     {financialSummary.invoicePendingUSD > 0 && (
                       <span className="text-sm font-extrabold text-slate-800 leading-none">
@@ -1635,7 +1650,12 @@ export default function Dashboard() {
               {/* PO Pending */}
               <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-2.5 flex flex-col justify-between min-h-[115px] col-span-1">
                 <div>
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5 block">PO Pending</span>
+                  <div className="flex justify-between items-start mb-1">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">PO Pending</span>
+                    <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.25 rounded-full leading-none border border-amber-100 animate-pulse-slow">
+                      {financialSummary.poPendingCount}
+                    </span>
+                  </div>
                   <div className="flex flex-col gap-0.5">
                     {financialSummary.poPendingUSD > 0 && (
                       <span className="text-sm font-extrabold text-amber-600 leading-none">
