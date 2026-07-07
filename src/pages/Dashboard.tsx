@@ -636,6 +636,79 @@ export default function Dashboard() {
     };
   }, [tickets]);
 
+  const financialSummary = useMemo(() => {
+    let invoicePendingUSD = 0;
+    let invoicePendingLKR = 0;
+    let poPendingUSD = 0;
+    let poPendingLKR = 0;
+    
+    const invoicePendingByAgent: Record<string, { USD: number; LKR: number }> = {};
+    const poPendingByAgent: Record<string, { USD: number; LKR: number }> = {};
+
+    (tickets || []).forEach(t => {
+      const isLKR = t.currency === 'LKR';
+      const agent = (t.travel_agent && String(t.travel_agent).trim()) || 'No Agency';
+
+      if (isInvoicePending(t)) {
+        const isFirstPending = !t.first_invoice_number || !t.first_invoice_number.trim();
+        const isSecondActive = ['NO_SHOW', 'CANCELLED', 'RESCHEDULED'].includes(t.flight_status);
+        const isSecondPending = isSecondActive && (!t.other_invoice_number || !t.other_invoice_number.trim());
+
+        let amt = 0;
+        if (isFirstPending) {
+          amt += Number(t.invoice_amount) || Number(t.approved_rate) || Number(t.price) || 0;
+        }
+        if (isSecondPending) {
+          amt += Number(t.other_invoice_amount) || Number(t.rescheduled_ticket_amount) || Number(t.approved_rate) || Number(t.price) || 0;
+        }
+
+        if (amt > 0) {
+          if (isLKR) {
+            invoicePendingLKR += amt;
+            if (!invoicePendingByAgent[agent]) invoicePendingByAgent[agent] = { USD: 0, LKR: 0 };
+            invoicePendingByAgent[agent].LKR += amt;
+          } else {
+            invoicePendingUSD += amt;
+            if (!invoicePendingByAgent[agent]) invoicePendingByAgent[agent] = { USD: 0, LKR: 0 };
+            invoicePendingByAgent[agent].USD += amt;
+          }
+        }
+      }
+
+      const isFirstPoPending = t.first_invoice_number && t.first_invoice_number.trim() && t.po_status !== 'payment done';
+      const isSecondPoPending = t.other_invoice_number && t.other_invoice_number.trim() && (t.other_po_status || 'pending po approval') !== 'payment done';
+
+      let poAmt = 0;
+      if (isFirstPoPending) {
+        poAmt += Number(t.invoice_amount) || Number(t.approved_rate) || Number(t.price) || 0;
+      }
+      if (isSecondPoPending) {
+        poAmt += Number(t.other_invoice_amount) || Number(t.rescheduled_ticket_amount) || Number(t.approved_rate) || Number(t.price) || 0;
+      }
+
+      if (poAmt > 0) {
+        if (isLKR) {
+          poPendingLKR += poAmt;
+          if (!poPendingByAgent[agent]) poPendingByAgent[agent] = { USD: 0, LKR: 0 };
+          poPendingByAgent[agent].LKR += poAmt;
+        } else {
+          poPendingUSD += poAmt;
+          if (!poPendingByAgent[agent]) poPendingByAgent[agent] = { USD: 0, LKR: 0 };
+          poPendingByAgent[agent].USD += poAmt;
+        }
+      }
+    });
+
+    return {
+      invoicePendingUSD,
+      invoicePendingLKR,
+      poPendingUSD,
+      poPendingLKR,
+      invoicePendingByAgent,
+      poPendingByAgent
+    };
+  }, [tickets]);
+
   const agentAccumulatedStats = useMemo(() => {
     const stats: Record<string, { count: number; cost: number }> = {};
     
@@ -1487,27 +1560,120 @@ export default function Dashboard() {
             </motion.button>
 
             {/* Quick Metrics */}
-            <div className="grid grid-cols-2 gap-3 flex-1">
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3 flex flex-col justify-center">
-                <span className="text-[9px] font-extrabold text-slate-450 uppercase tracking-wider mb-1">Processed</span>
-                <span className="text-xl font-black text-slate-900 leading-none">{dashboardTopSummary.totalTicketsCount}</span>
+            <div className="grid grid-cols-2 gap-2 flex-1">
+              {/* Processed */}
+              <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-2.5 flex flex-col justify-center min-h-[75px]">
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Processed</span>
+                <span className="text-lg font-black text-slate-800 leading-none">{dashboardTopSummary.totalTicketsCount}</span>
               </div>
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3 flex flex-col justify-center">
-                <span className="text-[9px] font-extrabold text-slate-450 uppercase tracking-wider mb-1">Invoices</span>
-                <span className="text-xl font-black text-slate-900 leading-none">{dashboardTopSummary.activeInvoicesCount}</span>
+
+              {/* Invoices */}
+              <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-2.5 flex flex-col justify-center min-h-[75px]">
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Invoices</span>
+                <span className="text-lg font-black text-slate-800 leading-none">{dashboardTopSummary.activeInvoicesCount}</span>
               </div>
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3 flex flex-col justify-center">
-                <span className="text-[9px] font-extrabold text-slate-450 uppercase tracking-wider mb-1">Passengers</span>
-                <span className="text-xl font-black text-slate-900 leading-none">{dashboardTopSummary.passengersCount}</span>
+
+              {/* Passengers */}
+              <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-2.5 flex flex-col justify-center min-h-[75px]">
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Passengers</span>
+                <span className="text-lg font-black text-slate-800 leading-none">{dashboardTopSummary.passengersCount}</span>
               </div>
+
+              {/* No Shows */}
               <motion.div 
                 initial={false}
                 animate={dashboardTopSummary.noShowCount > 0 ? { borderColor: '#fecaca' } : { borderColor: '#e2e8f0' }}
-                className={`bg-white rounded-xl shadow-sm border p-3 flex flex-col justify-center ${dashboardTopSummary.noShowCount > 0 ? 'animate-pulse-glowing-red' : ''}`}
+                className={`bg-white rounded-xl shadow-xs border p-2.5 flex flex-col justify-center min-h-[75px] ${dashboardTopSummary.noShowCount > 0 ? 'bg-red-50/20' : ''}`}
               >
-                <span className="text-[9px] font-extrabold text-slate-450 uppercase tracking-wider mb-1">No Shows</span>
-                <span className={`text-xl font-black ${dashboardTopSummary.noShowCount > 0 ? 'text-red-600' : 'text-slate-900'} leading-none`}>{dashboardTopSummary.noShowCount}</span>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">No Shows</span>
+                <span className={`text-lg font-black ${dashboardTopSummary.noShowCount > 0 ? 'text-red-600' : 'text-slate-800'} leading-none`}>{dashboardTopSummary.noShowCount}</span>
               </motion.div>
+
+              {/* Invoice Pending */}
+              <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-2.5 flex flex-col justify-between min-h-[115px] col-span-1">
+                <div>
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5 block">Invoice Pending</span>
+                  <div className="flex flex-col gap-0.5">
+                    {financialSummary.invoicePendingUSD > 0 && (
+                      <span className="text-sm font-extrabold text-slate-800 leading-none">
+                        ${financialSummary.invoicePendingUSD.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </span>
+                    )}
+                    {financialSummary.invoicePendingLKR > 0 && (
+                      <span className="text-xs font-bold text-slate-600 leading-none">
+                        LKR {financialSummary.invoicePendingLKR.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </span>
+                    )}
+                    {financialSummary.invoicePendingUSD === 0 && financialSummary.invoicePendingLKR === 0 && (
+                      <span className="text-xs font-bold text-slate-400 leading-none">None</span>
+                    )}
+                  </div>
+                </div>
+
+                {Object.entries(financialSummary.invoicePendingByAgent).length > 0 && (
+                  <div className="mt-1.5 pt-1.5 border-t border-slate-100 flex flex-col gap-0.5 max-h-[50px] overflow-y-auto scrollbar-thin">
+                    {Object.entries(financialSummary.invoicePendingByAgent).map(([agent, val]) => {
+                      const amt = val as { USD: number; LKR: number };
+                      const hasUSD = amt.USD > 0;
+                      const hasLKR = amt.LKR > 0;
+                      if (!hasUSD && !hasLKR) return null;
+                      return (
+                        <div key={agent} className="flex justify-between items-center text-[8px] leading-tight text-slate-500 font-medium truncate">
+                          <span className="truncate max-w-[65px]" title={agent}>{agent}</span>
+                          <span className="font-semibold text-slate-700 shrink-0">
+                            {hasUSD && `$${Math.round(amt.USD).toLocaleString()}`}
+                            {hasUSD && hasLKR && ' / '}
+                            {hasLKR && `${Math.round(amt.LKR / 1000).toLocaleString()}K`}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* PO Pending */}
+              <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-2.5 flex flex-col justify-between min-h-[115px] col-span-1">
+                <div>
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5 block">PO Pending</span>
+                  <div className="flex flex-col gap-0.5">
+                    {financialSummary.poPendingUSD > 0 && (
+                      <span className="text-sm font-extrabold text-amber-600 leading-none">
+                        ${financialSummary.poPendingUSD.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </span>
+                    )}
+                    {financialSummary.poPendingLKR > 0 && (
+                      <span className="text-xs font-bold text-amber-500 leading-none">
+                        LKR {financialSummary.poPendingLKR.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </span>
+                    )}
+                    {financialSummary.poPendingUSD === 0 && financialSummary.poPendingLKR === 0 && (
+                      <span className="text-xs font-bold text-slate-400 leading-none">None</span>
+                    )}
+                  </div>
+                </div>
+
+                {Object.entries(financialSummary.poPendingByAgent).length > 0 && (
+                  <div className="mt-1.5 pt-1.5 border-t border-slate-100 flex flex-col gap-0.5 max-h-[50px] overflow-y-auto scrollbar-thin">
+                    {Object.entries(financialSummary.poPendingByAgent).map(([agent, val]) => {
+                      const amt = val as { USD: number; LKR: number };
+                      const hasUSD = amt.USD > 0;
+                      const hasLKR = amt.LKR > 0;
+                      if (!hasUSD && !hasLKR) return null;
+                      return (
+                        <div key={agent} className="flex justify-between items-center text-[8px] leading-tight text-slate-500 font-medium truncate">
+                          <span className="truncate max-w-[65px]" title={agent}>{agent}</span>
+                          <span className="font-semibold text-amber-600 shrink-0">
+                            {hasUSD && `$${Math.round(amt.USD).toLocaleString()}`}
+                            {hasUSD && hasLKR && ' / '}
+                            {hasLKR && `${Math.round(amt.LKR / 1000).toLocaleString()}K`}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
