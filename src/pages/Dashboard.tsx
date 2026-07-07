@@ -1734,13 +1734,13 @@ export default function Dashboard() {
 
                 {Object.entries(financialSummary.invoicePendingByAgent).length > 0 && (
                   <div className="mt-1.5 pt-1.5 border-t border-slate-100 flex flex-col gap-0.5 max-h-[50px] overflow-y-auto scrollbar-thin">
-                    {Object.entries(financialSummary.invoicePendingByAgent).map(([agent, val]) => {
+                    {Object.entries(financialSummary.invoicePendingByAgent).map(([agent, val], idx) => {
                       const amt = val as { USD: number; LKR: number };
                       const hasUSD = amt.USD > 0;
                       const hasLKR = amt.LKR > 0;
                       if (!hasUSD && !hasLKR) return null;
                       return (
-                        <div key={agent} className="flex justify-between items-center text-[8px] leading-tight text-slate-500 font-medium truncate">
+                        <div key={`${agent}-${idx}`} className="flex justify-between items-center text-[8px] leading-tight text-slate-500 font-medium truncate">
                           <span className="truncate max-w-[65px]" title={agent}>{agent}</span>
                           <span className="font-semibold text-slate-700 shrink-0">
                             {hasUSD && `$${Math.round(amt.USD).toLocaleString()}`}
@@ -1782,13 +1782,13 @@ export default function Dashboard() {
 
                 {Object.entries(financialSummary.poPendingByAgent).length > 0 && (
                   <div className="mt-1.5 pt-1.5 border-t border-slate-100 flex flex-col gap-0.5 max-h-[50px] overflow-y-auto scrollbar-thin">
-                    {Object.entries(financialSummary.poPendingByAgent).map(([agent, val]) => {
+                    {Object.entries(financialSummary.poPendingByAgent).map(([agent, val], idx) => {
                       const amt = val as { USD: number; LKR: number };
                       const hasUSD = amt.USD > 0;
                       const hasLKR = amt.LKR > 0;
                       if (!hasUSD && !hasLKR) return null;
                       return (
-                        <div key={agent} className="flex justify-between items-center text-[8px] leading-tight text-slate-500 font-medium truncate">
+                        <div key={`${agent}-${idx}`} className="flex justify-between items-center text-[8px] leading-tight text-slate-500 font-medium truncate">
                           <span className="truncate max-w-[65px]" title={agent}>{agent}</span>
                           <span className="font-semibold text-amber-600 shrink-0">
                             {hasUSD && `$${Math.round(amt.USD).toLocaleString()}`}
@@ -2132,10 +2132,10 @@ export default function Dashboard() {
 
                 return (
                   <div className="space-y-6">
-                    {sortedAnalyticMonths.map((month) => {
+                    {sortedAnalyticMonths.map((month, idx) => {
                       const monthData = monthlyRouteStats[month];
                       return (
-                        <div key={month} className="bg-slate-50/55 rounded-xl border border-slate-200/60 p-5">
+                        <div key={`${month}-${idx}`} className="bg-slate-50/55 rounded-xl border border-slate-200/60 p-5">
                           {/* Month Header and Overall counters */}
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-slate-200/60 pb-3">
                             <div className="flex items-center gap-2">
@@ -2166,7 +2166,7 @@ export default function Dashboard() {
                               { key: 'CMB-MLE-CMB', label: 'CMB - MLE - CMB' },
                               { key: 'MLE-CMB', label: 'MLE - CMB' },
                               { key: 'MLE-CMB-MLE', label: 'MLE - CMB - MLE' }
-                            ].map((routeDef) => {
+                            ].map((routeDef, rIdx) => {
                               const rData = monthData.routes[routeDef.key];
                               
                               // Format averages helper
@@ -2183,8 +2183,8 @@ export default function Dashboard() {
                                 if (fares.length === 0) return <span className="text-slate-400 font-medium italic text-[11px]">No flights</span>;
                                 return (
                                   <div className="space-y-1">
-                                    {fares.map((f, idx) => (
-                                      <span key={idx} className="block text-slate-800 font-bold text-xs font-mono">{f}</span>
+                                    {fares.map((f, fIdx) => (
+                                      <span key={fIdx} className="block text-slate-800 font-bold text-xs font-mono">{f}</span>
                                     ))}
                                   </div>
                                 );
@@ -2195,7 +2195,7 @@ export default function Dashboard() {
                               const hasAny = rData.all.USD.count > 0 || rData.all.LKR.count > 0;
 
                               return (
-                                <div key={routeDef.key} className="bg-white rounded-xl border border-slate-200 p-4 shadow-3xs flex flex-col justify-between hover:border-sky-200 transition-colors">
+                                <div key={`${routeDef.key}-${rIdx}`} className="bg-white rounded-xl border border-slate-200 p-4 shadow-3xs flex flex-col justify-between hover:border-sky-200 transition-colors">
                                   <div>
                                     <div className="flex items-center justify-between gap-1 border-b border-slate-100 pb-2 mb-2.5">
                                       <h4 className="text-xs font-extrabold text-slate-700 tracking-wide">{routeDef.label}</h4>
@@ -4543,7 +4543,7 @@ export default function Dashboard() {
                                           {subTickets.map((t: any, idx: number) => {
                                             const isNoShow = t.invoice_type === 'other' ? t.rescheduled_flight_status === 'NO_SHOW' : t.flight_status === 'NO_SHOW';
                                             return (
-                                              <span key={t.id || `psg-${idx}`}>
+                                              <span key={`${t.id || 'psg'}-${idx}`}>
                                                 <span className={isNoShow ? "text-red-500 font-black" : ""}>
                                                   {t.passenger_name}{isNoShow ? " (NO-SHOW)" : ""}
                                                 </span>
