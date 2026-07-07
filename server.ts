@@ -379,12 +379,13 @@ class AdminDocRef {
 
 class AdminQuery {
   protected constraints: Array<{
-    type: "where" | "orderBy" | "limit";
+    type: "where" | "orderBy" | "limit" | "offset";
     field?: string;
     op?: string;
     val?: any;
     dir?: "asc" | "desc";
     limitVal?: number;
+    offsetVal?: number;
   }> = [];
 
   constructor(protected colPath: string) {}
@@ -404,6 +405,11 @@ class AdminQuery {
     return this;
   }
 
+  offset(n: number) {
+    this.constraints.push({ type: "offset", offsetVal: n });
+    return this;
+  }
+
   async get() {
     const path = this.colPath.replace(/^\/|\/$/g, "");
     const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${firestoreDatabaseId}/documents:runQuery?key=${apiKey}`;
@@ -415,6 +421,7 @@ class AdminQuery {
     const filters: any[] = [];
     const orders: any[] = [];
     let limitVal: number | undefined = undefined;
+    let offsetVal: number | undefined = undefined;
 
     for (const c of this.constraints) {
       if (c.type === "where") {
@@ -443,6 +450,8 @@ class AdminQuery {
         });
       } else if (c.type === "limit") {
         limitVal = c.limitVal;
+      } else if (c.type === "offset") {
+        offsetVal = c.offsetVal;
       }
     }
 
@@ -465,6 +474,10 @@ class AdminQuery {
 
     if (limitVal !== undefined) {
       structuredQuery.limit = limitVal;
+    }
+
+    if (offsetVal !== undefined) {
+      structuredQuery.offset = offsetVal;
     }
 
     const cacheKey = `query:${path}:${JSON.stringify(structuredQuery)}`;
@@ -1202,10 +1215,18 @@ app.get("/api/tickets", authenticateToken, async (req: any, res: any) => {
       q = q.where('flight_status', '==', req.query.flight_status);
     }
     
+    // Get total matching documents count from the collection/query (cached when possible)
+    const countSnap = await q.get();
+    const total = countSnap.docs.length;
+    
     q = q.orderBy('created_at', 'desc');
     
     const limit = parseInt(req.query.limit || '1000');
+    const offset = parseInt(req.query.offset || '0');
     q = q.limit(limit);
+    if (offset > 0) {
+      q = q.offset(offset);
+    }
     
     const snap = await q.get();
     const tickets = snap.docs.map(doc => ({
@@ -1215,7 +1236,7 @@ app.get("/api/tickets", authenticateToken, async (req: any, res: any) => {
       updated_at: doc.data().updated_at?.toDate?.()?.toISOString() || doc.data().updated_at,
     }));
     
-    res.json({ tickets, total: tickets.length });
+    res.json({ tickets, total });
   } catch (e: any) {
     console.error("Error fetching tickets:", e);
     const msg = (e?.message || "").toLowerCase();

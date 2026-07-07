@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import api from '../api';
 import toast from 'react-hot-toast';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
@@ -293,6 +293,10 @@ export default function Dashboard() {
   const [companies, setCompanies] = useState<any[]>([]);
   const [allProjects, setAllProjects] = useState<any[]>([]);
   const [tickets, setTickets] = useState<any[]>([]);
+  const [backgroundSyncing, setBackgroundSyncing] = useState(false);
+  const [syncedCount, setSyncedCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const fetchIdRef = useRef(0);
   const [loading, setLoading] = useState(true);
   const [flightUpdateTicket, setFlightUpdateTicket] = useState<any>(null);
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -924,29 +928,79 @@ export default function Dashboard() {
     }
   };
 
+  const fetchRemainingTicketsInBatches = async (startOffset: number, total: number, fetchId: number) => {
+    let currentOffset = startOffset;
+    const batchSize = 200;
+    while (currentOffset < total) {
+      if (fetchId !== fetchIdRef.current) return;
+      try {
+        const res = await api.get(`/tickets?limit=${batchSize}&offset=${currentOffset}`);
+        if (fetchId !== fetchIdRef.current) return;
+        const newTickets = res.data?.tickets || [];
+        if (newTickets.length === 0) break;
+        
+        setTickets(prev => {
+          if (fetchId !== fetchIdRef.current) return prev;
+          const existingIds = new Set(prev.map(tk => tk.id));
+          const filtered = newTickets.filter((tk: any) => !existingIds.has(tk.id));
+          const merged = [...prev, ...filtered];
+          setSyncedCount(merged.length);
+          return merged;
+        });
+        
+        currentOffset += batchSize;
+      } catch (err) {
+        console.error("Error fetching ticket batch:", err);
+        break;
+      }
+    }
+    if (fetchId === fetchIdRef.current) {
+      setBackgroundSyncing(false);
+    }
+  };
+
   const fetchData = async () => {
     if (!token) return;
+    const currentFetchId = ++fetchIdRef.current;
     try {
       const [m, f, p, t, o] = await Promise.all([
         api.get('/dashboard/metrics'),
         api.get('/dashboard/flight-status'),
         api.get('/dashboard/project-costs'),
-        api.get('/tickets?limit=1000'),
+        api.get('/tickets?limit=100&offset=0'),
         api.get('/options')
       ]);
+      
+      if (currentFetchId !== fetchIdRef.current) return;
+      
       setMetrics(m?.data || null);
       setFlightStatus(f?.data || {});
       const projData = (p?.data?.projects || []).filter((proj: any) => proj.budget > 0 || proj.spent > 0 || proj.pending > 0);
       setProjects(projData);
       setCompanies(p?.data?.companies || []);
-      setTickets(t?.data?.tickets || []);
+      
+      const firstBatch = t?.data?.tickets || [];
+      setTickets(firstBatch);
       setOptions(o?.data || []);
+      
+      const totalTickets = t?.data?.total || 0;
+      setTotalCount(totalTickets);
+      setSyncedCount(firstBatch.length);
+      
+      if (totalTickets > firstBatch.length) {
+        setBackgroundSyncing(true);
+        fetchRemainingTicketsInBatches(firstBatch.length, totalTickets, currentFetchId);
+      } else {
+        setBackgroundSyncing(false);
+      }
     } catch (error: any) {
       if (error.response?.status !== 401) {
         toast.error(error.response?.data?.detail || 'Failed to load dashboard data');
       }
     } finally {
-      setLoading(false);
+      if (currentFetchId === fetchIdRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -1313,7 +1367,18 @@ export default function Dashboard() {
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-12">
       <main className="max-w-[200rem] mx-auto px-4 sm:px-6 lg:px-8 py-8" id="main-content">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
+            {backgroundSyncing && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-100 shadow-xs">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
+                </span>
+                Syncing tickets ({syncedCount} / {totalCount})
+              </span>
+            )}
+          </div>
           <button 
             onClick={() => { fetchData(); fetchProjects(); }}
             type="button"
