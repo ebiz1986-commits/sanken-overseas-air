@@ -298,6 +298,7 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [agentFilter, setAgentFilter] = useState('ALL');
   const [ticketTypeFilter, setTicketTypeFilter] = useState('ALL');
+  const [donutType, setDonutType] = useState<'WORKFLOW' | 'FLIGHT'>('FLIGHT');
   const [options, setOptions] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -608,9 +609,13 @@ export default function Dashboard() {
     const noShowCount = tickets.filter(t => t.flight_status === 'NO_SHOW' || t.rescheduled_flight_status === 'NO_SHOW').length;
 
     const statusCounts: Record<string, number> = {};
+    const flightStatusCounts: Record<string, number> = {};
     tickets.forEach(ticket => {
       const s = ticket.status || 'UNKNOWN';
       statusCounts[s] = (statusCounts[s] || 0) + 1;
+
+      const fs = ticket.flight_status || 'PENDING';
+      flightStatusCounts[fs] = (flightStatusCounts[fs] || 0) + 1;
     });
 
     const updatingSince = earliestDate ? format(earliestDate, 'dd/MM/yyyy') : '31/12/2022';
@@ -621,6 +626,7 @@ export default function Dashboard() {
       passengersCount: uniquePassengers.size,
       noShowCount,
       statusCounts,
+      flightStatusCounts,
       totalTicketsCount: tickets.length,
       updatingSince
     };
@@ -1589,18 +1595,60 @@ export default function Dashboard() {
 
             {/* Charts Section */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 lg:col-span-1">
-                <h3 className="text-lg font-semibold text-slate-900 mb-4">Ticket Status Breakdown</h3>
-                <div className="h-64 flex items-center justify-center">
-                  {dashboardTopSummary.statusCounts ? (
-                    <DonutChart data={dashboardTopSummary.statusCounts as Record<string, number>} colors={{
-                      'COMPLETED': '#10b981',
-                      'DRAFT': '#94a3b8',
-                      'IN_PROGRESS': '#3b82f6'
-                    }} />
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-slate-400">No data available</div>
-                  )}
+              <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 lg:col-span-1 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
+                    <h3 className="text-sm font-black uppercase tracking-wider text-slate-700">Status Distribution</h3>
+                    <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0 select-none">
+                      <button 
+                        type="button"
+                        onClick={() => setDonutType('FLIGHT')}
+                        className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-wider rounded transition-all ${
+                          donutType === 'FLIGHT' 
+                            ? 'bg-white text-slate-800 shadow-3xs' 
+                            : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                      >
+                        Flight
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setDonutType('WORKFLOW')}
+                        className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-wider rounded transition-all ${
+                          donutType === 'WORKFLOW' 
+                            ? 'bg-white text-slate-800 shadow-3xs' 
+                            : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                      >
+                        Workflow
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center py-2">
+                    {donutType === 'FLIGHT' ? (
+                      dashboardTopSummary.flightStatusCounts ? (
+                        <DonutChart data={dashboardTopSummary.flightStatusCounts as Record<string, number>} colors={{
+                          'PENDING': '#64748b',
+                          'DEPARTED': '#10b981',
+                          'NO_SHOW': '#ef4444',
+                          'RESCHEDULED': '#f59e0b',
+                          'CANCELLED': '#ec4899'
+                        }} />
+                      ) : (
+                        <div className="flex items-center justify-center h-48 text-slate-400 text-xs font-semibold">No flight data available</div>
+                      )
+                    ) : (
+                      dashboardTopSummary.statusCounts ? (
+                        <DonutChart data={dashboardTopSummary.statusCounts as Record<string, number>} colors={{
+                          'COMPLETED': '#10b981',
+                          'DRAFT': '#94a3b8',
+                          'IN_PROGRESS': '#3b82f6'
+                        }} />
+                      ) : (
+                        <div className="flex items-center justify-center h-48 text-slate-400 text-xs font-semibold">No workflow data available</div>
+                      )
+                    )}
+                  </div>
                 </div>
               </div>
 

@@ -171,9 +171,20 @@ function getCachedWithExpiredFallback(key: string): any | null {
   return null;
 }
 
-async function fetchWithRetry(url: string, options: any = {}, retries = 10, delay = 500): Promise<Response> {
+async function fetchWithRetry(url: string, options: any = {}, retries = 4, delay = 500): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, 15000); // 15 seconds fetch timeout
+
+  const mergedOptions = {
+    ...options,
+    signal: controller.signal
+  };
+
   try {
-    const res = await fetch(url, options);
+    const res = await fetch(url, mergedOptions);
+    clearTimeout(timeoutId);
     if ((res.status === 429 || res.status >= 500) && retries > 0) {
       const jitter = Math.floor(Math.random() * delay);
       const sleepTime = delay + jitter;
@@ -184,6 +195,7 @@ async function fetchWithRetry(url: string, options: any = {}, retries = 10, dela
     }
     return res;
   } catch (err: any) {
+    clearTimeout(timeoutId);
     if (retries > 0) {
       const jitter = Math.floor(Math.random() * delay);
       const sleepTime = delay + jitter;
