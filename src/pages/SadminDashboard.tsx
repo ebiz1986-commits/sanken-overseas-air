@@ -195,8 +195,10 @@ export default function SadminDashboard() {
   const [a1SearchText, setA1SearchText] = useState('');
 
   // Widget F-1 Overdue Payments Sort & Month Selector
-  const [f1SortBy, setF1SortBy] = useState<'days' | 'month' | 'amount'>('days');
+  const [f1SortBy, setF1SortBy] = useState<'days' | 'month' | 'amount' | 'invoice_number' | 'travel_agent' | 'invoice_date'>('days');
   const [f1SortDir, setF1SortDir] = useState<'asc' | 'desc'>('desc');
+  const [f1StartDate, setF1StartDate] = useState<string>('');
+  const [f1EndDate, setF1EndDate] = useState<string>('');
 
   // Widget F-2 Month Selection Controls
   const [agentMonthOffset, setAgentMonthOffset] = useState<number>(0);
@@ -785,7 +787,18 @@ export default function SadminDashboard() {
 
     const list = Array.from(overdueInvoicesMap.values());
 
-    const totalAmount = list.reduce((accum, inv) => {
+    // Apply custom date range filtering
+    const filteredList = list.filter(inv => {
+      if (f1StartDate) {
+        if (inv.invoice_date < f1StartDate) return false;
+      }
+      if (f1EndDate) {
+        if (inv.invoice_date > f1EndDate) return false;
+      }
+      return true;
+    });
+
+    const totalAmount = filteredList.reduce((accum, inv) => {
       const isLkr = (inv.currency || 'USD').toUpperCase() === 'LKR';
       const r = inv.amount;
       return accum + (isLkr ? r / 300 : r);
@@ -793,14 +806,26 @@ export default function SadminDashboard() {
     
     // Longest overdue
     let maxOverdueDays = 0;
-    list.forEach(inv => {
+    filteredList.forEach(inv => {
       if (inv.age > maxOverdueDays) maxOverdueDays = inv.age;
     });
 
     // Handle interactive sorting of this widget table
-    const sortedList = [...list].sort((a, b) => {
+    const sortedList = [...filteredList].sort((a, b) => {
       if (f1SortBy === 'days') {
         return f1SortDir === 'asc' ? a.age - b.age : b.age - a.age;
+      } else if (f1SortBy === 'invoice_date') {
+        return f1SortDir === 'asc' 
+          ? a.invoice_date.localeCompare(b.invoice_date) 
+          : b.invoice_date.localeCompare(a.invoice_date);
+      } else if (f1SortBy === 'invoice_number') {
+        return f1SortDir === 'asc' 
+          ? a.invoice_number.localeCompare(b.invoice_number) 
+          : b.invoice_number.localeCompare(a.invoice_number);
+      } else if (f1SortBy === 'travel_agent') {
+        return f1SortDir === 'asc' 
+          ? a.travel_agent.localeCompare(b.travel_agent) 
+          : b.travel_agent.localeCompare(a.travel_agent);
       } else if (f1SortBy === 'month') {
         const monA = a.invoice_date ? format(safeParseISO(a.invoice_date), 'yyyy-MM') : '';
         const monB = b.invoice_date ? format(safeParseISO(b.invoice_date), 'yyyy-MM') : '';
@@ -810,8 +835,8 @@ export default function SadminDashboard() {
       }
     });
 
-    return { list: sortedList, count: list.length, totalAmount, maxOverdueDays };
-  }, [allTickets, f1SortBy, f1SortDir]);
+    return { list: sortedList, count: filteredList.length, totalAmount, maxOverdueDays };
+  }, [allTickets, f1SortBy, f1SortDir, f1StartDate, f1EndDate]);
 
   // WIDGET F-2 Agent Monthly Breakdown
   const f2AgentMetrics = useMemo(() => {
@@ -1973,33 +1998,71 @@ export default function SadminDashboard() {
                     
                     {/* WIDGET F-1 OVERDUE PAYMENTS AND CONSOLE ACTIONS */}
                     <section className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs">
-                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6">
                         <div>
                           <h3 className="font-extrabold text-base text-slate-905">Widget F-1 — Outstanding Overdue Payments</h3>
                           <p className="text-xs text-slate-500">Unpaid vendor invoices past due dates</p>
                         </div>
 
                         {/* Overdue filters & sort values Selector */}
-                        <div className="flex items-center space-x-2">
-                          <span className="text-xs text-slate-400 font-bold flex items-center">
-                            <Filter className="h-3.5 w-3.5 mr-1" /> Sort:
-                          </span>
-                          <select
-                            value={f1SortBy}
-                            onChange={e => setF1SortBy(e.target.value as any)}
-                            className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold py-1 px-2 rounded-lg outline-none"
-                          >
-                            <option value="days">Days Overdue</option>
-                            <option value="month">Month Due</option>
-                            <option value="amount">Amount Overdue</option>
-                          </select>
-                          <button
-                            onClick={() => setF1SortDir(prev => prev === 'asc' ? 'desc' : 'asc')}
-                            className="p-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-xs"
-                            title="Toggle direction"
-                          >
-                            {f1SortDir === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                          </button>
+                        <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+                          {/* Date Range Filter Section */}
+                          <div className="flex flex-wrap items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-200">
+                            <span className="text-[10px] text-slate-500 font-extrabold uppercase px-1">Date Range:</span>
+                            <div className="flex items-center space-x-1">
+                              <input
+                                type="date"
+                                value={f1StartDate}
+                                onChange={e => setF1StartDate(e.target.value)}
+                                className="bg-white border border-slate-200 text-slate-700 text-xs font-semibold py-1 px-2 rounded-lg outline-none focus:ring-1 focus:ring-sky-500"
+                                title="Start Date"
+                              />
+                              <span className="text-slate-400 text-xs font-bold">—</span>
+                              <input
+                                type="date"
+                                value={f1EndDate}
+                                onChange={e => setF1EndDate(e.target.value)}
+                                className="bg-white border border-slate-200 text-slate-700 text-xs font-semibold py-1 px-2 rounded-lg outline-none focus:ring-1 focus:ring-sky-500"
+                                title="End Date"
+                              />
+                            </div>
+                            {(f1StartDate || f1EndDate) && (
+                              <button
+                                onClick={() => {
+                                  setF1StartDate('');
+                                  setF1EndDate('');
+                                }}
+                                className="px-2.5 py-1 text-[10px] font-black text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-200"
+                              >
+                                Clear
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs text-slate-400 font-bold flex items-center">
+                              <Filter className="h-3.5 w-3.5 mr-1" /> Sort:
+                            </span>
+                            <select
+                              value={f1SortBy}
+                              onChange={e => setF1SortBy(e.target.value as any)}
+                              className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold py-1 px-2 rounded-lg outline-none"
+                            >
+                              <option value="days">Days Overdue</option>
+                              <option value="invoice_date">Original Due Date</option>
+                              <option value="month">Month Due</option>
+                              <option value="invoice_number">Invoice Ref</option>
+                              <option value="travel_agent">Vendor / Payee</option>
+                              <option value="amount">Amount Overdue</option>
+                            </select>
+                            <button
+                              onClick={() => setF1SortDir(prev => prev === 'asc' ? 'desc' : 'asc')}
+                              className="p-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-xs"
+                              title="Toggle direction"
+                            >
+                              {f1SortDir === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            </button>
+                          </div>
                         </div>
                       </div>
 
@@ -2025,13 +2088,127 @@ export default function SadminDashboard() {
                       <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                           <thead>
-                            <tr className="border-b border-slate-100 text-slate-400 text-[10px] font-black uppercase tracking-wider">
-                              <th className="px-4 py-2.5">Invoice Ref</th>
-                              <th className="px-4 py-2.5">Vendor / Payee</th>
-                              <th className="px-4 py-2.5 text-right">Original Due Date</th>
-                              <th className="px-4 py-2.5 text-right">Month Due</th>
-                              <th className="px-4 py-2.5 text-center">Days Overdue</th>
-                              <th className="px-4 py-2.5 text-right">Amount</th>
+                            <tr className="border-b border-slate-100 text-slate-400 text-[10px] font-black uppercase tracking-wider select-none">
+                              <th 
+                                className="px-4 py-3.5 cursor-pointer hover:bg-slate-50 transition-colors rounded-l-xl"
+                                onClick={() => {
+                                  if (f1SortBy === 'invoice_number') {
+                                    setF1SortDir(prev => prev === 'asc' ? 'desc' : 'asc');
+                                  } else {
+                                    setF1SortBy('invoice_number');
+                                    setF1SortDir('asc');
+                                  }
+                                }}
+                              >
+                                <div className="flex items-center space-x-1">
+                                  <span>Invoice Ref</span>
+                                  {f1SortBy === 'invoice_number' ? (
+                                    f1SortDir === 'asc' ? <ChevronUp className="h-3 w-3 text-slate-600" /> : <ChevronDown className="h-3 w-3 text-slate-600" />
+                                  ) : (
+                                    <span className="text-slate-300 opacity-0 hover:opacity-100 transition-opacity">↕</span>
+                                  )}
+                                </div>
+                              </th>
+                              <th 
+                                className="px-4 py-3.5 cursor-pointer hover:bg-slate-50 transition-colors"
+                                onClick={() => {
+                                  if (f1SortBy === 'travel_agent') {
+                                    setF1SortDir(prev => prev === 'asc' ? 'desc' : 'asc');
+                                  } else {
+                                    setF1SortBy('travel_agent');
+                                    setF1SortDir('asc');
+                                  }
+                                }}
+                              >
+                                <div className="flex items-center space-x-1">
+                                  <span>Vendor / Payee</span>
+                                  {f1SortBy === 'travel_agent' ? (
+                                    f1SortDir === 'asc' ? <ChevronUp className="h-3 w-3 text-slate-600" /> : <ChevronDown className="h-3 w-3 text-slate-600" />
+                                  ) : (
+                                    <span className="text-slate-300 opacity-0 hover:opacity-100 transition-opacity">↕</span>
+                                  )}
+                                </div>
+                              </th>
+                              <th 
+                                className="px-4 py-3.5 cursor-pointer hover:bg-slate-50 transition-colors text-right"
+                                onClick={() => {
+                                  if (f1SortBy === 'invoice_date') {
+                                    setF1SortDir(prev => prev === 'asc' ? 'desc' : 'asc');
+                                  } else {
+                                    setF1SortBy('invoice_date');
+                                    setF1SortDir('asc');
+                                  }
+                                }}
+                              >
+                                <div className="flex items-center justify-end space-x-1">
+                                  <span>Original Due Date</span>
+                                  {f1SortBy === 'invoice_date' ? (
+                                    f1SortDir === 'asc' ? <ChevronUp className="h-3 w-3 text-slate-600" /> : <ChevronDown className="h-3 w-3 text-slate-600" />
+                                  ) : (
+                                    <span className="text-slate-300 opacity-0 hover:opacity-100 transition-opacity">↕</span>
+                                  )}
+                                </div>
+                              </th>
+                              <th 
+                                className="px-4 py-3.5 cursor-pointer hover:bg-slate-50 transition-colors text-right"
+                                onClick={() => {
+                                  if (f1SortBy === 'month') {
+                                    setF1SortDir(prev => prev === 'asc' ? 'desc' : 'asc');
+                                  } else {
+                                    setF1SortBy('month');
+                                    setF1SortDir('asc');
+                                  }
+                                }}
+                              >
+                                <div className="flex items-center justify-end space-x-1">
+                                  <span>Month Due</span>
+                                  {f1SortBy === 'month' ? (
+                                    f1SortDir === 'asc' ? <ChevronUp className="h-3 w-3 text-slate-600" /> : <ChevronDown className="h-3 w-3 text-slate-600" />
+                                  ) : (
+                                    <span className="text-slate-300 opacity-0 hover:opacity-100 transition-opacity">↕</span>
+                                  )}
+                                </div>
+                              </th>
+                              <th 
+                                className="px-4 py-3.5 cursor-pointer hover:bg-slate-50 transition-colors text-center"
+                                onClick={() => {
+                                  if (f1SortBy === 'days') {
+                                    setF1SortDir(prev => prev === 'asc' ? 'desc' : 'asc');
+                                  } else {
+                                    setF1SortBy('days');
+                                    setF1SortDir('asc');
+                                  }
+                                }}
+                              >
+                                <div className="flex items-center justify-center space-x-1">
+                                  <span>Days Overdue</span>
+                                  {f1SortBy === 'days' ? (
+                                    f1SortDir === 'asc' ? <ChevronUp className="h-3 w-3 text-slate-600" /> : <ChevronDown className="h-3 w-3 text-slate-600" />
+                                  ) : (
+                                    <span className="text-slate-300 opacity-0 hover:opacity-100 transition-opacity">↕</span>
+                                  )}
+                                </div>
+                              </th>
+                              <th 
+                                className="px-4 py-3.5 cursor-pointer hover:bg-slate-50 transition-colors text-right rounded-r-xl"
+                                onClick={() => {
+                                  if (f1SortBy === 'amount') {
+                                    setF1SortDir(prev => prev === 'asc' ? 'desc' : 'asc');
+                                  } else {
+                                    setF1SortBy('amount');
+                                    setF1SortDir('asc');
+                                  }
+                                }}
+                              >
+                                <div className="flex items-center justify-end space-x-1">
+                                  <span>Amount</span>
+                                  {f1SortBy === 'amount' ? (
+                                    f1SortDir === 'asc' ? <ChevronUp className="h-3 w-3 text-slate-600" /> : <ChevronDown className="h-3 w-3 text-slate-600" />
+                                  ) : (
+                                    <span className="text-slate-300 opacity-0 hover:opacity-100 transition-opacity">↕</span>
+                                  )}
+                                </div>
+                              </th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 text-xs">
