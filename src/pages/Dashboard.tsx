@@ -3300,13 +3300,14 @@ export default function Dashboard() {
                             <div className="flex justify-end items-center space-x-3">
                               {role !== 'FINANCE' && t.status !== 'COMPLETED' && (() => {
                                 const isDeparted = t.flight_status === 'DEPARTED' || t.rescheduled_flight_status === 'DEPARTED';
+                                const isDisabled = isDeparted && role !== 'ADMIN' && role !== 'ADMIN1';
                                 return (
                                   <button 
                                     type="button"
-                                    disabled={isDeparted}
+                                    disabled={isDisabled}
                                     onClick={(e) => { e.stopPropagation(); setFlightUpdateTicket(t); }} 
                                     className={`px-1.5 py-0.5 rounded inline-flex items-center border text-[10px] focus:outline-none focus:ring-1 transition-all duration-150 ${
-                                      isDeparted 
+                                      isDisabled 
                                         ? "opacity-50 cursor-not-allowed bg-slate-100 border-slate-200 text-slate-400 font-semibold" 
                                         : "text-amber-700 hover:text-amber-900 font-bold bg-amber-50 border-amber-200 focus:ring-amber-500"
                                     }`}
@@ -3733,13 +3734,14 @@ export default function Dashboard() {
                             <div className="flex justify-end items-center space-x-3">
                               {role !== 'FINANCE' && t.status !== 'COMPLETED' && (() => {
                                 const isDeparted = t.flight_status === 'DEPARTED' || t.rescheduled_flight_status === 'DEPARTED';
+                                const isDisabled = isDeparted && role !== 'ADMIN' && role !== 'ADMIN1';
                                 return (
                                   <button 
                                     type="button"
-                                    disabled={isDeparted}
+                                    disabled={isDisabled}
                                     onClick={(e) => { e.stopPropagation(); setFlightUpdateTicket(t); }} 
                                     className={`px-1.5 py-0.5 rounded inline-flex items-center border text-[10px] focus:outline-none focus:ring-1 transition-all duration-150 ${
-                                      isDeparted 
+                                      isDisabled 
                                         ? "opacity-50 cursor-not-allowed bg-slate-100 border-slate-200 text-slate-400 font-semibold" 
                                         : "text-amber-700 hover:text-amber-900 font-bold bg-amber-50 border-amber-200 focus:ring-amber-500"
                                     }`}

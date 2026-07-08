@@ -44,6 +44,8 @@ export default function TicketDetails() {
   const [isScanningOtherInvoiceDetails, setIsScanningOtherInvoiceDetails] = useState(false);
   const [firstInvoiceNo, setFirstInvoiceNo] = useState('');
   const [otherInvoiceNo, setOtherInvoiceNo] = useState('');
+  const [firstInvoiceDate, setFirstInvoiceDate] = useState('');
+  const [otherInvoiceDate, setOtherInvoiceDate] = useState('');
 
   const { errors, handleBlur, handleChange: handleValidationChange, validateForm } = useFormValidation();
 
@@ -150,6 +152,8 @@ export default function TicketDetails() {
       
       setFirstInvoiceNo(newTicket.first_invoice_number || '');
       setOtherInvoiceNo(newTicket.other_invoice_number || '');
+      setFirstInvoiceDate(newTicket.first_invoice_date || '');
+      setOtherInvoiceDate(newTicket.other_invoice_date || '');
       setActivityLogs(Array.isArray(ticketRes.data?.activity) ? ticketRes.data.activity : []);
       setUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
       setOptions(Array.isArray(optionsRes.data) ? optionsRes.data : []);
@@ -393,13 +397,13 @@ export default function TicketDetails() {
     }
   };
 
-  const saveInvoiceNumber = async (field: 'first_invoice_number' | 'other_invoice_number', value: string) => {
+  const saveInvoiceField = async (field: 'first_invoice_number' | 'other_invoice_number' | 'first_invoice_date' | 'other_invoice_date', value: string) => {
     try {
       await api.put(`/tickets/${id}/documents`, { [field]: value });
-      toast.success('Invoice number saved successfully');
+      toast.success('Invoice detail saved successfully');
       fetchData();
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to save invoice number');
+      toast.error(error.response?.data?.error || 'Failed to save invoice detail');
     }
   };
 
@@ -700,7 +704,7 @@ export default function TicketDetails() {
                           value={stage2Data.flight_status} 
                           onChange={handleStage2Change} 
                           onBlur={handleBlur} 
-                          disabled={isLocked || hasSecondTicket || (!hasDeparturePassed && role !== 'ADMIN' && role !== 'ADMIN1')} 
+                          disabled={((isLocked || hasSecondTicket) && role !== 'ADMIN' && role !== 'ADMIN1') || (!hasDeparturePassed && role !== 'ADMIN' && role !== 'ADMIN1')} 
                           className={`w-full px-2 py-1.5 text-sm border transition-all duration-300 ${
                             formFlightStatusHighlight 
                               ? 'ring-2 ring-sky-500/80 border-sky-500 bg-sky-500/5 shadow-xs scale-[1.01]' 
@@ -824,7 +828,7 @@ export default function TicketDetails() {
                               value={stage2Data.rescheduled_flight_status || 'PENDING'} 
                               onChange={handleStage2Change} 
                               onBlur={handleBlur}
-                              disabled={isLocked || (!hasRescheduledDeparturePassed && role !== 'ADMIN' && role !== 'ADMIN1')}
+                              disabled={(isLocked && role !== 'ADMIN' && role !== 'ADMIN1') || (!hasRescheduledDeparturePassed && role !== 'ADMIN' && role !== 'ADMIN1')}
                               className={`w-full px-2 py-1.5 text-sm border transition-all duration-300 ${
                                 formRescheduledFlightStatusHighlight 
                                   ? 'ring-2 ring-orange-500/80 border-orange-500 bg-orange-500/5 shadow-xs scale-[1.01]' 
@@ -857,19 +861,30 @@ export default function TicketDetails() {
                                   )}
                                   <div className="text-xs">
                                     <span className="font-semibold text-emerald-600 block text-[11px]">Attached ✓</span>
-                                    <input 
-                                      type="text" 
-                                      disabled={isLocked}
-                                      placeholder="Invoice Reference" 
-                                      value={otherInvoiceNo} 
-                                      onChange={(e) => setOtherInvoiceNo(e.target.value)} 
-                                      onBlur={() => saveInvoiceNumber('other_invoice_number', otherInvoiceNo)} 
-                                      className="mt-0.5 text-[11px] p-1 border border-slate-200 rounded font-mono font-medium focus:border-orange-500 outline-none w-28 bg-white text-black disabled:bg-slate-100 disabled:text-slate-500" 
-                                    />
+                                    <div className="flex flex-col gap-1.5 mt-1">
+                                      <input 
+                                        type="text" 
+                                        disabled={isLocked && role !== 'ADMIN' && role !== 'ADMIN1'}
+                                        placeholder="Invoice Reference" 
+                                        value={otherInvoiceNo} 
+                                        onChange={(e) => setOtherInvoiceNo(e.target.value)} 
+                                        onBlur={() => saveInvoiceField('other_invoice_number', otherInvoiceNo)} 
+                                        className="text-[11px] p-1 border border-slate-200 rounded font-mono font-medium focus:border-orange-500 outline-none w-32 bg-white text-black disabled:bg-slate-100 disabled:text-slate-500" 
+                                      />
+                                      <input 
+                                        type="date" 
+                                        disabled={isLocked && role !== 'ADMIN' && role !== 'ADMIN1'}
+                                        placeholder="Invoice Date" 
+                                        value={otherInvoiceDate} 
+                                        onChange={(e) => setOtherInvoiceDate(e.target.value)} 
+                                        onBlur={() => saveInvoiceField('other_invoice_date', otherInvoiceDate)} 
+                                        className="text-[11px] p-1 border border-slate-200 rounded font-medium focus:border-orange-500 outline-none w-32 bg-white text-black disabled:bg-slate-100 disabled:text-slate-500" 
+                                      />
+                                    </div>
                                   </div>
                                 </div>
                                 <div className="flex gap-1">
-                                  {!isLocked && (
+                                  {(!isLocked || role === 'ADMIN' || role === 'ADMIN1') && (
                                     <>
                                       <button 
                                         type="button" 
@@ -880,7 +895,10 @@ export default function TicketDetails() {
                                       </button>
                                       <button 
                                         type="button" 
-                                        onClick={() => saveInvoiceNumber('other_invoice_number', otherInvoiceNo)} 
+                                        onClick={async () => {
+                                          await saveInvoiceField('other_invoice_number', otherInvoiceNo);
+                                          await saveInvoiceField('other_invoice_date', otherInvoiceDate);
+                                        }} 
                                         className="text-[10px] bg-emerald-50 hover:bg-emerald-100 text-emerald-600 font-semibold px-2 py-1 rounded border border-emerald-100 cursor-pointer"
                                       >
                                         Save
@@ -1079,36 +1097,64 @@ export default function TicketDetails() {
                       )}
 
                       {ticketData.first_invoice && (
-                        <div className="mt-3 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                          <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
-                            Invoice Reference (1st Attempt)
-                          </label>
-                          <div className="flex items-center space-x-1 relative">
-                            <input
-                              type="text"
-                              value={firstInvoiceNo}
-                              onChange={(e) => setFirstInvoiceNo(e.target.value)}
-                              onBlur={() => saveInvoiceNumber('first_invoice_number', firstInvoiceNo)}
-                              placeholder={isScanningFirstInvoiceDetails ? "Scanning invoice..." : "Invoice number"}
-                              disabled={isScanningFirstInvoiceDetails || isLocked}
-                              className="text-xs p-1.5 border border-slate-300 rounded font-mono font-medium w-full focus:ring-1 focus:ring-emerald-500 bg-white outline-none disabled:bg-slate-100 disabled:text-slate-400"
-                            />
-                            {!isLocked && (
-                              <button
-                                type="button"
-                                onClick={() => saveInvoiceNumber('first_invoice_number', firstInvoiceNo)}
-                                title="Save invoice number"
-                                className="p-1 px-2 text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 font-semibold rounded cursor-pointer flex items-center shrink-0"
-                              >
-                                <Save className="w-3.5 h-3.5 mr-1" /> Save
-                              </button>
-                            )}
-                            {isScanningFirstInvoiceDetails && (
-                              <div className="absolute right-20 top-2 flex items-center space-x-1 bg-white px-1">
-                                <div className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-ping" />
-                                <span className="text-[8px] font-bold text-sky-600 uppercase tracking-wider">Scanning...</span>
-                              </div>
-                            )}
+                        <div className="mt-3 bg-slate-50 p-2.5 rounded-lg border border-slate-200 space-y-2">
+                          <div>
+                            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
+                              Invoice Reference (1st Attempt)
+                            </label>
+                            <div className="flex items-center space-x-1 relative">
+                              <input
+                                type="text"
+                                value={firstInvoiceNo}
+                                onChange={(e) => setFirstInvoiceNo(e.target.value)}
+                                onBlur={() => saveInvoiceField('first_invoice_number', firstInvoiceNo)}
+                                placeholder={isScanningFirstInvoiceDetails ? "Scanning invoice..." : "Invoice number"}
+                                disabled={isScanningFirstInvoiceDetails || (isLocked && role !== 'ADMIN' && role !== 'ADMIN1')}
+                                className="text-xs p-1.5 border border-slate-300 rounded font-mono font-medium w-full focus:ring-1 focus:ring-emerald-500 bg-white outline-none disabled:bg-slate-100 disabled:text-slate-400"
+                              />
+                              {(!isLocked || role === 'ADMIN' || role === 'ADMIN1') && (
+                                <button
+                                  type="button"
+                                  onClick={() => saveInvoiceField('first_invoice_number', firstInvoiceNo)}
+                                  title="Save invoice number"
+                                  className="p-1 px-2 text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 font-semibold rounded cursor-pointer flex items-center shrink-0"
+                                >
+                                  <Save className="w-3.5 h-3.5 mr-1" /> Save
+                                </button>
+                              )}
+                              {isScanningFirstInvoiceDetails && (
+                                <div className="absolute right-20 top-2 flex items-center space-x-1 bg-white px-1">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-ping" />
+                                  <span className="text-[8px] font-bold text-sky-600 uppercase tracking-wider">Scanning...</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
+                              Invoice Date (1st Attempt)
+                            </label>
+                            <div className="flex items-center space-x-1 relative">
+                              <input
+                                type="date"
+                                value={firstInvoiceDate}
+                                onChange={(e) => setFirstInvoiceDate(e.target.value)}
+                                onBlur={() => saveInvoiceField('first_invoice_date', firstInvoiceDate)}
+                                disabled={isScanningFirstInvoiceDetails || (isLocked && role !== 'ADMIN' && role !== 'ADMIN1')}
+                                className="text-xs p-1.5 border border-slate-300 rounded font-medium w-full focus:ring-1 focus:ring-emerald-500 bg-white outline-none disabled:bg-slate-100 disabled:text-slate-400"
+                              />
+                              {(!isLocked || role === 'ADMIN' || role === 'ADMIN1') && (
+                                <button
+                                  type="button"
+                                  onClick={() => saveInvoiceField('first_invoice_date', firstInvoiceDate)}
+                                  title="Save invoice date"
+                                  className="p-1 px-2 text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 font-semibold rounded cursor-pointer flex items-center shrink-0"
+                                >
+                                  <Save className="w-3.5 h-3.5 mr-1" /> Save
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       )}
@@ -1124,7 +1170,7 @@ export default function TicketDetails() {
                           >
                             <Download className="w-3.5 h-3.5 mr-1" /> Download
                           </button>
-                          {['ADMIN', 'ADMIN1', 'FINANCE'].includes(role) && !isLocked && (
+                          {['ADMIN', 'ADMIN1', 'FINANCE'].includes(role) && (!isLocked || role === 'ADMIN' || role === 'ADMIN1') && (
                             <button
                               type="button"
                               onClick={() => handleDocumentDelete('first_invoice')}
@@ -1135,7 +1181,7 @@ export default function TicketDetails() {
                           )}
                         </>
                       ) : (
-                        ['ADMIN', 'ADMIN1', 'FINANCE'].includes(role) && !isLocked ? (
+                        ['ADMIN', 'ADMIN1', 'FINANCE'].includes(role) && (!isLocked || role === 'ADMIN' || role === 'ADMIN1') ? (
                           <div className="w-full">
                             <input
                               type="url"
@@ -1150,7 +1196,7 @@ export default function TicketDetails() {
                           </div>
                         ) : (
                           <span className="text-[10px] text-slate-400 select-none">
-                            {isLocked ? "Locked (PO Assigned)" : "Admin or Finance permission needed"}
+                            {isLocked && role !== 'ADMIN' && role !== 'ADMIN1' ? "Locked (PO Assigned)" : "Admin or Finance permission needed"}
                           </span>
                         )
                       )}
@@ -1213,36 +1259,64 @@ export default function TicketDetails() {
                       )}
 
                       {ticketData.other_invoice && (
-                        <div className="mt-3 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                          <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
-                            Invoice Reference (2nd Attempt)
-                          </label>
-                          <div className="flex items-center space-x-1 relative">
-                            <input
-                              type="text"
-                              value={otherInvoiceNo}
-                              onChange={(e) => setOtherInvoiceNo(e.target.value)}
-                              onBlur={() => saveInvoiceNumber('other_invoice_number', otherInvoiceNo)}
-                              placeholder={isScanningOtherInvoiceDetails ? "Scanning invoice..." : "Invoice number"}
-                              disabled={isScanningOtherInvoiceDetails || hasPoAssigned}
-                              className="text-xs p-1.5 border border-slate-300 rounded font-mono font-medium w-full focus:ring-1 focus:ring-amber-500 bg-white outline-none disabled:bg-slate-100 disabled:text-slate-400"
-                            />
-                            {!hasPoAssigned && (
-                              <button
-                                type="button"
-                                onClick={() => saveInvoiceNumber('other_invoice_number', otherInvoiceNo)}
-                                title="Save invoice number"
-                                className="p-1 px-2 text-xs bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 font-semibold rounded cursor-pointer flex items-center shrink-0"
-                              >
-                                <Save className="w-3.5 h-3.5 mr-1" /> Save
-                              </button>
-                            )}
-                            {isScanningOtherInvoiceDetails && (
-                              <div className="absolute right-20 top-2 flex items-center space-x-1 bg-white px-1">
-                                <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
-                                <span className="text-[8px] font-bold text-amber-600 uppercase tracking-wider">Scanning...</span>
-                              </div>
-                            )}
+                        <div className="mt-3 bg-slate-50 p-2.5 rounded-lg border border-slate-200 space-y-2">
+                          <div>
+                            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
+                              Invoice Reference (2nd Attempt)
+                            </label>
+                            <div className="flex items-center space-x-1 relative">
+                              <input
+                                type="text"
+                                value={otherInvoiceNo}
+                                onChange={(e) => setOtherInvoiceNo(e.target.value)}
+                                onBlur={() => saveInvoiceField('other_invoice_number', otherInvoiceNo)}
+                                placeholder={isScanningOtherInvoiceDetails ? "Scanning invoice..." : "Invoice number"}
+                                disabled={isScanningOtherInvoiceDetails || hasPoAssigned}
+                                className="text-xs p-1.5 border border-slate-300 rounded font-mono font-medium w-full focus:ring-1 focus:ring-amber-500 bg-white outline-none disabled:bg-slate-100 disabled:text-slate-400"
+                              />
+                              {!hasPoAssigned && (
+                                <button
+                                  type="button"
+                                  onClick={() => saveInvoiceField('other_invoice_number', otherInvoiceNo)}
+                                  title="Save invoice number"
+                                  className="p-1 px-2 text-xs bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 font-semibold rounded cursor-pointer flex items-center shrink-0"
+                                >
+                                  <Save className="w-3.5 h-3.5 mr-1" /> Save
+                                </button>
+                              )}
+                              {isScanningOtherInvoiceDetails && (
+                                <div className="absolute right-20 top-2 flex items-center space-x-1 bg-white px-1">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
+                                  <span className="text-[8px] font-bold text-amber-600 uppercase tracking-wider">Scanning...</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
+                              Invoice Date (2nd Attempt)
+                            </label>
+                            <div className="flex items-center space-x-1 relative">
+                              <input
+                                type="date"
+                                value={otherInvoiceDate}
+                                onChange={(e) => setOtherInvoiceDate(e.target.value)}
+                                onBlur={() => saveInvoiceField('other_invoice_date', otherInvoiceDate)}
+                                disabled={isScanningOtherInvoiceDetails || hasPoAssigned}
+                                className="text-xs p-1.5 border border-slate-300 rounded font-medium w-full focus:ring-1 focus:ring-amber-500 bg-white outline-none disabled:bg-slate-100 disabled:text-slate-400"
+                              />
+                              {!hasPoAssigned && (
+                                <button
+                                  type="button"
+                                  onClick={() => saveInvoiceField('other_invoice_date', otherInvoiceDate)}
+                                  title="Save invoice date"
+                                  className="p-1 px-2 text-xs bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 font-semibold rounded cursor-pointer flex items-center shrink-0"
+                                >
+                                  <Save className="w-3.5 h-3.5 mr-1" /> Save
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       )}

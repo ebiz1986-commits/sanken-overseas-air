@@ -1490,7 +1490,7 @@ app.put("/api/tickets/:id/documents", authenticateToken, async (req: any, res: a
   }
 
   const { id } = req.params;
-  const { first_atbf, first_invoice, other_invoice, attached_images, first_invoice_number, other_invoice_number } = req.body;
+  const { first_atbf, first_invoice, other_invoice, attached_images, first_invoice_number, other_invoice_number, first_invoice_date, other_invoice_date } = req.body;
 
   try {
     const docRef = fdb.collection('tickets').doc(id);
@@ -1509,6 +1509,8 @@ app.put("/api/tickets/:id/documents", authenticateToken, async (req: any, res: a
     if (attached_images !== undefined) updateData.attached_images = attached_images;
     if (first_invoice_number !== undefined) updateData.first_invoice_number = first_invoice_number;
     if (other_invoice_number !== undefined) updateData.other_invoice_number = other_invoice_number;
+    if (first_invoice_date !== undefined) updateData.first_invoice_date = first_invoice_date;
+    if (other_invoice_date !== undefined) updateData.other_invoice_date = other_invoice_date;
 
     const mergedFlightStatus = ticket?.flight_status;
     if (['NO_SHOW', 'CANCELLED', 'RESCHEDULED'].includes(mergedFlightStatus)) {

@@ -116,7 +116,8 @@ export default function UpdateFlightStatusModal({ ticket, isOpen, onClose, onSuc
         rescheduled_flight_status: ticket.rescheduled_flight_status || 'PENDING',
         rescheduled_arrival_date: ticket.rescheduled_arrival_date || '',
         other_invoice: ticket.other_invoice || '',
-        other_invoice_number: ticket.other_invoice_number || ''
+        other_invoice_number: ticket.other_invoice_number || '',
+        other_invoice_date: ticket.other_invoice_date || ''
       });
     }
   }, [ticket, isOpen]);
@@ -266,7 +267,7 @@ export default function UpdateFlightStatusModal({ ticket, isOpen, onClose, onSuc
                     <option value="CANCELLED" style={{ color: '#000000' }}>CANCELLED</option>
                   </select>
                 </div>
-                <div className="md:col-span-2">
+                <div>
                   <label className="block text-xs font-bold uppercase tracking-wider mb-1" style={{ color: '#c2410c' }}>2nd Attempt Invoice Number</label>
                   <input 
                     type="text" 
@@ -275,6 +276,16 @@ export default function UpdateFlightStatusModal({ ticket, isOpen, onClose, onSuc
                     onChange={(e) => setFormData(prev => ({ ...prev, other_invoice_number: e.target.value }))} 
                     placeholder="Enter 2nd Attempt Invoice number reference"
                     className="w-full px-2 py-1.5 text-sm border border-orange-300 rounded focus:ring-1 focus:ring-orange-500 outline-none font-semibold text-black bg-white placeholder:text-slate-400" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider mb-1" style={{ color: '#c2410c' }}>2nd Attempt Invoice Date</label>
+                  <input 
+                    type="date" 
+                    name="other_invoice_date" 
+                    value={formData.other_invoice_date} 
+                    onChange={(e) => setFormData(prev => ({ ...prev, other_invoice_date: e.target.value }))} 
+                    className="w-full px-2 py-1.5 text-sm border border-orange-300 rounded focus:ring-1 focus:ring-orange-500 outline-none font-semibold text-black bg-white" 
                   />
                 </div>
               </div>
@@ -311,26 +322,35 @@ export default function UpdateFlightStatusModal({ ticket, isOpen, onClose, onSuc
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
-                      <div className="relative">
+                      <div className="flex flex-col gap-1.5 shrink-0">
+                        <div className="relative">
+                          <input 
+                            type="text" 
+                            placeholder="Invoice number" 
+                            value={formData.other_invoice_number} 
+                            onChange={(e) => setFormData(prev => ({ ...prev, other_invoice_number: e.target.value }))}
+                            disabled={isScanningOtherInvoice}
+                            className="text-xs p-1.5 border border-slate-300 rounded font-mono font-semibold focus:border-orange-500 outline-none w-36 bg-white text-black" 
+                          />
+                          {isScanningOtherInvoice && (
+                            <div className="absolute right-2 top-2.5 flex items-center space-x-1 bg-white px-1">
+                              <div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-ping" />
+                              <span className="text-[7px] font-bold text-orange-600 uppercase tracking-widest">Scanning...</span>
+                            </div>
+                          )}
+                        </div>
                         <input 
-                          type="text" 
-                          placeholder="Invoice number" 
-                          value={formData.other_invoice_number} 
-                          onChange={(e) => setFormData(prev => ({ ...prev, other_invoice_number: e.target.value }))}
-                          disabled={isScanningOtherInvoice}
-                          className="text-xs p-1.5 border border-slate-300 rounded font-mono font-semibold focus:border-orange-500 outline-none w-36 bg-white text-black" 
+                          type="date" 
+                          placeholder="Invoice date" 
+                          value={formData.other_invoice_date} 
+                          onChange={(e) => setFormData(prev => ({ ...prev, other_invoice_date: e.target.value }))}
+                          className="text-xs p-1.5 border border-slate-300 rounded font-semibold focus:border-orange-500 outline-none w-36 bg-white text-black" 
                         />
-                        {isScanningOtherInvoice && (
-                          <div className="absolute right-2 top-2.5 flex items-center space-x-1 bg-white px-1">
-                            <div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-ping" />
-                            <span className="text-[7px] font-bold text-orange-600 uppercase tracking-widest">Scanning...</span>
-                          </div>
-                        )}
                       </div>
                       <button 
                         type="button" 
-                        onClick={() => setFormData(prev => ({ ...prev, other_invoice: '', other_invoice_number: '' }))} 
-                        className="text-[11px] bg-red-50 hover:bg-red-100 text-red-600 font-semibold px-2.5 py-1.5 rounded border border-red-100 cursor-pointer"
+                        onClick={() => setFormData(prev => ({ ...prev, other_invoice: '', other_invoice_number: '', other_invoice_date: '' }))} 
+                        className="text-[11px] bg-red-50 hover:bg-red-100 text-red-600 font-semibold px-2.5 py-1.5 rounded border border-red-100 cursor-pointer shrink-0"
                       >
                         Remove
                       </button>
