@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import api from '../api';
 import toast from 'react-hot-toast';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, LineChart, Line, AreaChart, Area } from 'recharts';
 import { useAuthStore } from '../store';
 import { LogOut, Plus, Search, Download, AlertCircle, AlertTriangle, X, Upload, Image, Eye, Trash2, LayoutGrid, List, FileText, File, ExternalLink, ChevronDown, ChevronUp, Users, Award, TrendingUp, SlidersHorizontal, RefreshCw, Calendar, Plane } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -747,6 +747,59 @@ export default function Dashboard() {
       count: data.count,
       cost: data.cost
     })).sort((a, b) => b.cost - a.cost);
+  }, [tickets]);
+
+  const pricingIntelligence = useMemo(() => {
+    const dailyData: Record<string, { totalCost: number; count: number }> = {};
+    let highestSingle = 0;
+    let lowestSingle = Infinity;
+    let totalSpent = 0;
+    let totalCount = 0;
+
+    (tickets || []).forEach(t => {
+      const cost = Number(t.approved_rate) || Number(t.price) || Number(t.invoice_amount) || 0;
+      if (cost > 0) {
+        if (cost > highestSingle) highestSingle = cost;
+        if (cost < lowestSingle) lowestSingle = cost;
+        totalSpent += cost;
+        totalCount++;
+
+        const dateVal = t.ticket_arranged_date || t.departure_date || t.created_at;
+        if (dateVal) {
+          try {
+            const dateStr = format(new Date(dateVal), 'yyyy-MM-dd');
+            if (!dailyData[dateStr]) {
+              dailyData[dateStr] = { totalCost: 0, count: 0 };
+            }
+            dailyData[dateStr].totalCost += cost;
+            dailyData[dateStr].count += 1;
+          } catch {
+            // ignore
+          }
+        }
+      }
+    });
+
+    if (lowestSingle === Infinity) lowestSingle = 0;
+
+    const sortedDates = Object.keys(dailyData).sort().slice(-20); // last 20 active days
+    const chartData = sortedDates.map(dateStr => {
+      const d = dailyData[dateStr];
+      return {
+        date: format(new Date(dateStr + 'T00:00:00'), 'MMM dd'),
+        avgPrice: Math.round(d.totalCost / d.count),
+        volume: d.count,
+      };
+    });
+
+    const averagePrice = totalCount > 0 ? Math.round(totalSpent / totalCount) : 0;
+
+    return {
+      highestSingle,
+      lowestSingle,
+      averagePrice,
+      chartData,
+    };
   }, [tickets]);
 
   const monthlyRouteStats = useMemo(() => {
@@ -1587,46 +1640,78 @@ export default function Dashboard() {
             initial={{ opacity: 0, y: 15 }} 
             animate={{ opacity: 1, y: 0 }} 
             transition={{ duration: 0.4 }}
-            className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col h-full min-h-[220px]"
+            className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col h-full justify-between"
           >
-            <div className="flex items-center justify-between mb-2">
-              <div>
-                <h3 className="text-[12px] font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>
-                  Workflow Status
-                </h3>
-                <p className="text-[10px] text-slate-500 mt-0.5">Real-time pipeline orchestration.</p>
+            <div>
+              <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
+                <div>
+                  <h3 className="text-[12px] font-extrabold text-slate-850 uppercase tracking-widest flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>
+                    Workflow Status
+                  </h3>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Real-time pipeline orchestration.</p>
+                </div>
+                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest bg-emerald-50 border border-emerald-100 px-2.5 py-0.5 rounded-full">
+                  Live
+                </span>
               </div>
-              <span className="text-[10px] font-semibold text-emerald-600 uppercase tracking-widest bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
-                Live
-              </span>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-2 flex-1">
-              {Object.entries(dashboardTopSummary.statusCounts).map(([status, count]) => {
-                const label = status.replace(/_/g, ' ');
-                const isCompleted = status === 'COMPLETED';
-                const isProgress = status === 'IN_PROGRESS';
-                
-                return (
-                  <motion.div
-                    key={status}
-                    whileHover={{ scale: 1.02 }}
-                    className="flex flex-col justify-center bg-slate-50/60 border border-slate-200/60 hover:border-sky-300 p-3 rounded-xl transition-all text-left cursor-pointer"
-                  >
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1" title={label}>
-                      {label}
+              
+              {/* Compact 3-Status Grid */}
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                {[
+                  { key: 'DRAFT', label: 'Draft', color: 'bg-slate-50 text-slate-700 border-slate-200/60', count: dashboardTopSummary.statusCounts['DRAFT'] || 0 },
+                  { key: 'IN_PROGRESS', label: 'In Progress', color: 'bg-sky-50/50 text-sky-700 border-sky-100', count: dashboardTopSummary.statusCounts['IN_PROGRESS'] || 0 },
+                  { key: 'COMPLETED', label: 'Completed', color: 'bg-emerald-50/50 text-emerald-700 border-emerald-100', count: dashboardTopSummary.statusCounts['COMPLETED'] || 0 },
+                ].map(({ key, label, color, count }) => (
+                  <div key={key} className={`border p-2 rounded-xl text-center flex flex-col justify-center ${color}`}>
+                    <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 mb-0.5">{label}</span>
+                    <span className="text-lg font-black leading-none">{count}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Progress and Quality Indicators */}
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">
+                    <span>Workflow Completion</span>
+                    <span>{((dashboardTopSummary.statusCounts['COMPLETED'] || 0) / (dashboardTopSummary.totalTicketsCount || 1) * 100).toFixed(1)}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden border border-slate-200/60">
+                    <div 
+                      className="bg-gradient-to-r from-sky-400 to-emerald-500 h-full rounded-full transition-all duration-500" 
+                      style={{ width: `${Math.min(100, ((dashboardTopSummary.statusCounts['COMPLETED'] || 0) / (dashboardTopSummary.totalTicketsCount || 1) * 100))}%` }}
+                    ></div>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-100 pt-3 mt-1 flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500 font-semibold flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+                      Flight Status Updates Pending:
                     </span>
-                    <span className="text-2xl font-black text-slate-800 leading-none">
-                      {count as React.ReactNode}
+                    <span className={`font-black px-1.5 py-0.5 rounded text-[10px] ${updateRequiredCount > 0 ? 'bg-amber-50 text-amber-600 border border-amber-100' : 'bg-slate-50 text-slate-400'}`}>
+                      {updateRequiredCount || 0}
                     </span>
-                  </motion.div>
-                );
-              })}
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500 font-semibold flex items-center gap-1.5">
+                      <TrendingUp className="w-3.5 h-3.5 text-sky-500" />
+                      Invoices Pending Payment:
+                    </span>
+                    <span className={`font-black px-1.5 py-0.5 rounded text-[10px] ${invoicePendingCount > 0 ? 'bg-sky-50 text-sky-700 border border-sky-100' : 'bg-slate-50 text-slate-400'}`}>
+                      {invoicePendingCount || 0}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="border-t border-slate-100 pt-3 mt-4 text-[10px] text-slate-400 flex items-center gap-2">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-              Real-time sync across pipeline stages
+
+            <div className="border-t border-slate-100 pt-3 mt-3 text-[10px] text-slate-400 flex items-center gap-2">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              Synchronized & live pipeline status
             </div>
           </motion.div>
 
@@ -1635,31 +1720,66 @@ export default function Dashboard() {
             initial={{ opacity: 0, y: 15 }} 
             animate={{ opacity: 1, y: 0 }} 
             transition={{ duration: 0.4, delay: 0.1 }}
-            className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col h-full min-h-[220px]"
+            className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col h-full justify-between"
           >
-            <div className="flex items-center justify-between mb-2">
-              <div>
-                <h3 className="text-[12px] font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                  <Users className="w-4 h-4 text-emerald-500" />
-                  Ticketing Agents
-                </h3>
-                <p className="text-[10px] text-slate-500 mt-0.5">Performance & volume overview.</p>
+            <div>
+              <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
+                <div>
+                  <h3 className="text-[12px] font-bold text-slate-850 uppercase tracking-widest flex items-center gap-2">
+                    <Users className="w-4 h-4 text-emerald-500" />
+                    Ticketing Agents
+                  </h3>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Performance & volume overview.</p>
+                </div>
+                <span className="text-[10px] text-slate-400 font-bold">
+                  {agentAccumulatedStats.length} Payees
+                </span>
+              </div>
+              
+              <div className="space-y-2.5">
+                {agentAccumulatedStats.map(({ agent, count, cost }, idx) => {
+                  const averagePrice = count > 0 ? cost / count : 0;
+                  const totalTickets = dashboardTopSummary.totalTicketsCount || 1;
+                  const ticketShare = (count / totalTickets) * 100;
+
+                  return (
+                    <div 
+                      key={`${agent}-${idx}`}
+                      className="flex flex-col bg-slate-50/70 border border-slate-200/50 hover:border-sky-300 p-2.5 rounded-xl transition-all"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-extrabold text-slate-800 truncate max-w-[120px]" title={agent}>{agent}</span>
+                        <span className="text-xs font-black text-slate-900">{count} <span className="text-[9px] text-slate-400 font-normal uppercase">Tickets</span></span>
+                      </div>
+                      
+                      <div className="flex justify-between items-center text-[10px] text-slate-500 font-semibold mb-1">
+                        <div className="flex gap-2">
+                          <span>Avg: <strong className="text-slate-750">${Math.round(averagePrice).toLocaleString()}</strong></span>
+                          <span>•</span>
+                          <span>Share: <strong className="text-slate-750">{ticketShare.toFixed(0)}%</strong></span>
+                        </div>
+                        <span className="font-extrabold text-emerald-600">${cost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                      </div>
+
+                      {/* Progress bar */}
+                      <div className="w-full bg-slate-200/50 h-1 rounded-full overflow-hidden">
+                        <div 
+                          className="bg-emerald-500 h-full rounded-full transition-all duration-500" 
+                          style={{ width: `${ticketShare}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-            
-            <div className="space-y-2 flex-1 overflow-y-auto">
-              {agentAccumulatedStats.map(({ agent, count, cost }, idx) => (
-                <div 
-                  key={`${agent}-${idx}`}
-                  className="flex items-center justify-between bg-slate-50 border border-slate-100 p-3 rounded-xl"
-                >
-                  <span className="text-sm font-bold text-slate-700 truncate" title={agent}>{agent}</span>
-                  <div className="text-right">
-                    <span className="text-xs font-black text-slate-900 block">{count} Tickets</span>
-                    <span className="text-[10px] font-bold text-emerald-600">${cost.toLocaleString()}</span>
-                  </div>
-                </div>
-              ))}
+
+            <div className="border-t border-slate-100 pt-3 mt-3 text-[10px] text-slate-400 flex items-center justify-between">
+              <span className="flex items-center gap-1">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                Vendor market share
+              </span>
+              <span className="font-extrabold text-slate-500 font-mono text-[9px]">TOTAL ARRANGED</span>
             </div>
           </motion.div>
 
@@ -2095,6 +2215,108 @@ export default function Dashboard() {
               </div>
 
             </div>
+
+            {/* Daily Pricing Intelligence & Trend Analysis */}
+            <motion.div 
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.15 }}
+              className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mt-8"
+            >
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-sky-500" />
+                    Daily Ticket Pricing Intelligence & Fluctuations
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Day-by-day analysis of average ticket price and volume over the last 30 active days.
+                  </p>
+                </div>
+
+                {/* Micro-indicators */}
+                <div className="flex items-center gap-4 bg-slate-50 p-3 rounded-xl border border-slate-200/60 self-start md:self-auto">
+                  <div className="text-left">
+                    <span className="block text-[9px] font-black uppercase text-slate-400 tracking-wider">Average Price</span>
+                    <span className="text-sm font-black text-slate-800">${pricingIntelligence.averagePrice.toLocaleString()}</span>
+                  </div>
+                  <div className="h-6 w-px bg-slate-200"></div>
+                  <div className="text-left">
+                    <span className="block text-[9px] font-black uppercase text-slate-400 tracking-wider">Highest Ticket</span>
+                    <span className="text-sm font-black text-slate-800">${pricingIntelligence.highestSingle.toLocaleString()}</span>
+                  </div>
+                  <div className="h-6 w-px bg-slate-200"></div>
+                  <div className="text-left">
+                    <span className="block text-[9px] font-black uppercase text-slate-400 tracking-wider">Lowest Ticket</span>
+                    <span className="text-sm font-black text-slate-800">${pricingIntelligence.lowestSingle.toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="h-72">
+                {pricingIntelligence.chartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={pricingIntelligence.chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorAvgPrice" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.2}/>
+                          <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0.01}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                      <XAxis 
+                        dataKey="date" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fill: '#64748B', fontSize: 10, fontWeight: 500 }} 
+                      />
+                      <YAxis 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fill: '#64748B', fontSize: 10 }}
+                        tickFormatter={(val) => `$${val}`}
+                      />
+                      <RechartsTooltip 
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <div className="bg-white border border-slate-200 p-3 rounded-lg shadow-md text-xs">
+                                <p className="font-extrabold text-slate-900 mb-1.5">{data.date}</p>
+                                <div className="space-y-1">
+                                  <p className="text-slate-650 flex justify-between gap-4">
+                                    <span>Avg Ticket Price:</span>
+                                    <strong className="text-sky-600">${data.avgPrice.toLocaleString()}</strong>
+                                  </p>
+                                  <p className="text-slate-650 flex justify-between gap-4">
+                                    <span>Tickets Booked:</span>
+                                    <strong className="text-slate-800">{data.volume}</strong>
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="avgPrice" 
+                        stroke="#0ea5e9" 
+                        strokeWidth={2.5}
+                        fillOpacity={1} 
+                        fill="url(#colorAvgPrice)" 
+                        name="Average Price ($)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-slate-400 text-xs font-semibold">
+                    No daily pricing data available.
+                  </div>
+                )}
+              </div>
+            </motion.div>
 
             {/* Monthly Route Average & Ticket Volume Analysis */}
             <motion.div 
