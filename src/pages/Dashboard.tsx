@@ -644,8 +644,8 @@ export default function Dashboard() {
     let invoicePendingCount = 0;
     let poPendingCount = 0;
     
-    const invoicePendingByAgent: Record<string, { USD: number; LKR: number }> = {};
-    const poPendingByAgent: Record<string, { USD: number; LKR: number }> = {};
+    const invoicePendingByAgent: Record<string, { USD: number; LKR: number; count: number }> = {};
+    const poPendingByAgent: Record<string, { USD: number; LKR: number; count: number }> = {};
 
     (tickets || []).forEach(t => {
       const isLKR = t.currency === 'LKR';
@@ -667,13 +667,13 @@ export default function Dashboard() {
 
         if (amt > 0) {
           isInvPending = true;
+          if (!invoicePendingByAgent[agent]) invoicePendingByAgent[agent] = { USD: 0, LKR: 0, count: 0 };
+          invoicePendingByAgent[agent].count++;
           if (isLKR) {
             invoicePendingLKR += amt;
-            if (!invoicePendingByAgent[agent]) invoicePendingByAgent[agent] = { USD: 0, LKR: 0 };
             invoicePendingByAgent[agent].LKR += amt;
           } else {
             invoicePendingUSD += amt;
-            if (!invoicePendingByAgent[agent]) invoicePendingByAgent[agent] = { USD: 0, LKR: 0 };
             invoicePendingByAgent[agent].USD += amt;
           }
         }
@@ -695,13 +695,13 @@ export default function Dashboard() {
 
       if (poAmt > 0) {
         poPendingCount++;
+        if (!poPendingByAgent[agent]) poPendingByAgent[agent] = { USD: 0, LKR: 0, count: 0 };
+        poPendingByAgent[agent].count++;
         if (isLKR) {
           poPendingLKR += poAmt;
-          if (!poPendingByAgent[agent]) poPendingByAgent[agent] = { USD: 0, LKR: 0 };
           poPendingByAgent[agent].LKR += poAmt;
         } else {
           poPendingUSD += poAmt;
-          if (!poPendingByAgent[agent]) poPendingByAgent[agent] = { USD: 0, LKR: 0 };
           poPendingByAgent[agent].USD += poAmt;
         }
       }
@@ -1735,13 +1735,15 @@ export default function Dashboard() {
                 {Object.entries(financialSummary.invoicePendingByAgent).length > 0 && (
                   <div className="mt-1.5 pt-1.5 border-t border-slate-100 flex flex-col gap-0.5 max-h-[50px] overflow-y-auto scrollbar-thin">
                     {Object.entries(financialSummary.invoicePendingByAgent).map(([agent, val], idx) => {
-                      const amt = val as { USD: number; LKR: number };
+                      const amt = val as { USD: number; LKR: number; count: number };
                       const hasUSD = amt.USD > 0;
                       const hasLKR = amt.LKR > 0;
                       if (!hasUSD && !hasLKR) return null;
                       return (
                         <div key={`${agent}-${idx}`} className="flex justify-between items-center text-[8px] leading-tight text-slate-500 font-medium truncate">
-                          <span className="truncate max-w-[65px]" title={agent}>{agent}</span>
+                          <span className="truncate max-w-[65px]" title={agent}>
+                            {agent} <span className="text-[7px] text-slate-400 font-bold font-mono">({amt.count})</span>
+                          </span>
                           <span className="font-semibold text-slate-700 shrink-0">
                             {hasUSD && `$${Math.round(amt.USD).toLocaleString()}`}
                             {hasUSD && hasLKR && ' / '}
@@ -1783,13 +1785,15 @@ export default function Dashboard() {
                 {Object.entries(financialSummary.poPendingByAgent).length > 0 && (
                   <div className="mt-1.5 pt-1.5 border-t border-slate-100 flex flex-col gap-0.5 max-h-[50px] overflow-y-auto scrollbar-thin">
                     {Object.entries(financialSummary.poPendingByAgent).map(([agent, val], idx) => {
-                      const amt = val as { USD: number; LKR: number };
+                      const amt = val as { USD: number; LKR: number; count: number };
                       const hasUSD = amt.USD > 0;
                       const hasLKR = amt.LKR > 0;
                       if (!hasUSD && !hasLKR) return null;
                       return (
                         <div key={`${agent}-${idx}`} className="flex justify-between items-center text-[8px] leading-tight text-slate-500 font-medium truncate">
-                          <span className="truncate max-w-[65px]" title={agent}>{agent}</span>
+                          <span className="truncate max-w-[65px]" title={agent}>
+                            {agent} <span className="text-[7px] text-amber-400 font-bold font-mono">({amt.count})</span>
+                          </span>
                           <span className="font-semibold text-amber-600 shrink-0">
                             {hasUSD && `$${Math.round(amt.USD).toLocaleString()}`}
                             {hasUSD && hasLKR && ' / '}
