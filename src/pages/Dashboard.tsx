@@ -1784,7 +1784,7 @@ export default function Dashboard() {
           </motion.div>
 
           {/* Column 3: Refresh and Metrics Overview */}
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-4">
             <motion.button 
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -1797,63 +1797,65 @@ export default function Dashboard() {
             </motion.button>
 
             {/* Quick Metrics */}
-            <div className="grid grid-cols-2 gap-2 flex-1">
+            <div className="grid grid-cols-4 gap-2">
               {/* Processed */}
-              <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-2.5 flex flex-col justify-center min-h-[75px]">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Processed</span>
-                <span className="text-lg font-black text-slate-800 leading-none">{dashboardTopSummary.totalTicketsCount}</span>
+              <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-2 flex flex-col items-center justify-center text-center">
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1 text-center">Processed</span>
+                <span className="text-base font-black text-slate-800 leading-none">{dashboardTopSummary.totalTicketsCount}</span>
               </div>
 
               {/* Invoices */}
-              <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-2.5 flex flex-col justify-center min-h-[75px]">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Invoices</span>
-                <span className="text-lg font-black text-slate-800 leading-none">{dashboardTopSummary.activeInvoicesCount}</span>
+              <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-2 flex flex-col items-center justify-center text-center">
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1 text-center">Invoices</span>
+                <span className="text-base font-black text-slate-800 leading-none">{dashboardTopSummary.activeInvoicesCount}</span>
               </div>
 
               {/* Passengers */}
-              <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-2.5 flex flex-col justify-center min-h-[75px]">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Passengers</span>
-                <span className="text-lg font-black text-slate-800 leading-none">{dashboardTopSummary.passengersCount}</span>
+              <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-2 flex flex-col items-center justify-center text-center">
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1 text-center">Passengers</span>
+                <span className="text-base font-black text-slate-800 leading-none">{dashboardTopSummary.passengersCount}</span>
               </div>
 
               {/* No Shows */}
               <motion.div 
                 initial={false}
                 animate={dashboardTopSummary.noShowCount > 0 ? { borderColor: '#fecaca' } : { borderColor: '#e2e8f0' }}
-                className={`bg-white rounded-xl shadow-xs border p-2.5 flex flex-col justify-center min-h-[75px] ${dashboardTopSummary.noShowCount > 0 ? 'bg-red-50/20' : ''}`}
+                className={`bg-white rounded-xl shadow-xs border p-2 flex flex-col items-center justify-center text-center ${dashboardTopSummary.noShowCount > 0 ? 'bg-red-50/20' : ''}`}
               >
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">No Shows</span>
-                <span className={`text-lg font-black ${dashboardTopSummary.noShowCount > 0 ? 'text-red-600' : 'text-slate-800'} leading-none`}>{dashboardTopSummary.noShowCount}</span>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1 text-center">No Shows</span>
+                <span className={`text-base font-black ${dashboardTopSummary.noShowCount > 0 ? 'text-red-600' : 'text-slate-800'} leading-none`}>{dashboardTopSummary.noShowCount}</span>
               </motion.div>
+            </div>
 
+            {/* Invoice & PO Pending compact cards */}
+            <div className="grid grid-cols-2 gap-2">
               {/* Invoice Pending */}
-              <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-2.5 flex flex-col justify-between min-h-[115px] col-span-1">
+              <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-2.5 flex flex-col justify-between min-h-[95px]">
                 <div>
-                  <div className="flex justify-between items-start mb-1">
+                  <div className="flex justify-between items-start mb-0.5">
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Invoice Pending</span>
                     <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.25 rounded-full leading-none">
                       {financialSummary.invoicePendingCount}
                     </span>
                   </div>
-                  <div className="flex flex-col gap-0.5">
+                  <div className="flex flex-col">
                     {financialSummary.invoicePendingUSD > 0 && (
-                      <span className="text-sm font-extrabold text-slate-800 leading-none">
+                      <span className="text-xs font-extrabold text-slate-800 leading-none">
                         ${financialSummary.invoicePendingUSD.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                       </span>
                     )}
                     {financialSummary.invoicePendingLKR > 0 && (
-                      <span className="text-xs font-bold text-slate-600 leading-none">
+                      <span className="text-[10px] font-bold text-slate-600 leading-none mt-0.5">
                         LKR {financialSummary.invoicePendingLKR.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                       </span>
                     )}
                     {financialSummary.invoicePendingUSD === 0 && financialSummary.invoicePendingLKR === 0 && (
-                      <span className="text-xs font-bold text-slate-400 leading-none">None</span>
+                      <span className="text-[10px] font-bold text-slate-400 leading-none">None</span>
                     )}
                   </div>
                 </div>
-
                 {Object.entries(financialSummary.invoicePendingByAgent).length > 0 && (
-                  <div className="mt-1.5 pt-1.5 border-t border-slate-100 flex flex-col gap-0.5 max-h-[50px] overflow-y-auto scrollbar-thin">
+                  <div className="mt-1 pt-1 border-t border-slate-100 flex flex-col gap-0.5 max-h-[35px] overflow-y-auto scrollbar-thin">
                     {Object.entries(financialSummary.invoicePendingByAgent).map(([agent, val], idx) => {
                       const amt = val as { USD: number; LKR: number; count: number };
                       const hasUSD = amt.USD > 0;
@@ -1861,13 +1863,11 @@ export default function Dashboard() {
                       if (!hasUSD && !hasLKR) return null;
                       return (
                         <div key={`${agent}-${idx}`} className="flex justify-between items-center text-[8px] leading-tight text-slate-500 font-medium truncate">
-                          <span className="truncate max-w-[65px]" title={agent}>
-                            {agent} <span className="text-[7px] text-slate-400 font-bold font-mono">({amt.count})</span>
+                          <span className="truncate max-w-[55px]" title={agent}>
+                            {agent}
                           </span>
                           <span className="font-semibold text-slate-700 shrink-0">
                             {hasUSD && `$${Math.round(amt.USD).toLocaleString()}`}
-                            {hasUSD && hasLKR && ' / '}
-                            {hasLKR && `${Math.round(amt.LKR / 1000).toLocaleString()}K`}
                           </span>
                         </div>
                       );
@@ -1877,33 +1877,32 @@ export default function Dashboard() {
               </div>
 
               {/* PO Pending */}
-              <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-2.5 flex flex-col justify-between min-h-[115px] col-span-1">
+              <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-2.5 flex flex-col justify-between min-h-[95px]">
                 <div>
-                  <div className="flex justify-between items-start mb-1">
+                  <div className="flex justify-between items-start mb-0.5">
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">PO Pending</span>
                     <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.25 rounded-full leading-none border border-amber-100 animate-pulse-slow">
                       {financialSummary.poPendingCount}
                     </span>
                   </div>
-                  <div className="flex flex-col gap-0.5">
+                  <div className="flex flex-col">
                     {financialSummary.poPendingUSD > 0 && (
-                      <span className="text-sm font-extrabold text-amber-600 leading-none">
+                      <span className="text-xs font-extrabold text-amber-600 leading-none">
                         ${financialSummary.poPendingUSD.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                       </span>
                     )}
                     {financialSummary.poPendingLKR > 0 && (
-                      <span className="text-xs font-bold text-amber-500 leading-none">
+                      <span className="text-[10px] font-bold text-amber-500 leading-none mt-0.5">
                         LKR {financialSummary.poPendingLKR.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                       </span>
                     )}
                     {financialSummary.poPendingUSD === 0 && financialSummary.poPendingLKR === 0 && (
-                      <span className="text-xs font-bold text-slate-400 leading-none">None</span>
+                      <span className="text-[10px] font-bold text-slate-400 leading-none">None</span>
                     )}
                   </div>
                 </div>
-
                 {Object.entries(financialSummary.poPendingByAgent).length > 0 && (
-                  <div className="mt-1.5 pt-1.5 border-t border-slate-100 flex flex-col gap-0.5 max-h-[50px] overflow-y-auto scrollbar-thin">
+                  <div className="mt-1 pt-1 border-t border-slate-100 flex flex-col gap-0.5 max-h-[35px] overflow-y-auto scrollbar-thin">
                     {Object.entries(financialSummary.poPendingByAgent).map(([agent, val], idx) => {
                       const amt = val as { USD: number; LKR: number; count: number };
                       const hasUSD = amt.USD > 0;
@@ -1911,13 +1910,11 @@ export default function Dashboard() {
                       if (!hasUSD && !hasLKR) return null;
                       return (
                         <div key={`${agent}-${idx}`} className="flex justify-between items-center text-[8px] leading-tight text-slate-500 font-medium truncate">
-                          <span className="truncate max-w-[65px]" title={agent}>
-                            {agent} <span className="text-[7px] text-amber-400 font-bold font-mono">({amt.count})</span>
+                          <span className="truncate max-w-[55px]" title={agent}>
+                            {agent}
                           </span>
                           <span className="font-semibold text-amber-600 shrink-0">
                             {hasUSD && `$${Math.round(amt.USD).toLocaleString()}`}
-                            {hasUSD && hasLKR && ' / '}
-                            {hasLKR && `${Math.round(amt.LKR / 1000).toLocaleString()}K`}
                           </span>
                         </div>
                       );
@@ -1926,6 +1923,71 @@ export default function Dashboard() {
                 )}
               </div>
             </div>
+
+            {/* NEW: Sub-contractor Ticket Entitlements Summary (Shorter Version) */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between flex-1 min-h-[160px]">
+              <div>
+                <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-slate-150">
+                  <h3 className="text-[11px] font-extrabold text-slate-800 uppercase tracking-widest flex items-center gap-1.5">
+                    <Award className="w-3.5 h-3.5 text-sky-500" />
+                    Sub-contractor Entitlements
+                  </h3>
+                  <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-md font-mono font-bold">
+                    {subcontractorEntitlementsData.length} items
+                  </span>
+                </div>
+
+                <div className="space-y-2 max-h-[135px] overflow-y-auto pr-1 scrollbar-thin">
+                  {subcontractorEntitlementsData.length === 0 ? (
+                    <div className="text-center text-[10px] text-slate-400 py-4 italic">
+                      No subcontractor entitlements configured.
+                    </div>
+                  ) : (
+                    subcontractorEntitlementsData.slice(0, 5).map((item, idx) => {
+                      const usagePercent = item.initial > 0 ? (item.applied / item.initial) * 100 : 0;
+                      const isOver = item.remaining < 0;
+                      const isLow = !isOver && item.remaining <= 3;
+                      
+                      return (
+                        <div key={`${item.projectId}-${item.company}-${idx}`} className="flex flex-col bg-slate-50/50 hover:bg-slate-50 border border-slate-200/40 p-1.5 rounded-lg transition-colors">
+                          <div className="flex justify-between items-start mb-0.5">
+                            <div className="truncate max-w-[150px]">
+                              <p className="text-[10px] font-extrabold text-slate-850 truncate leading-tight" title={item.projectName}>{item.projectName}</p>
+                              <p className="text-[8px] font-semibold text-slate-400 truncate leading-none mt-0.5">{item.company}</p>
+                            </div>
+                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full font-mono ${
+                              isOver 
+                                ? 'bg-rose-50 text-rose-700 border border-rose-100' 
+                                : isLow 
+                                  ? 'bg-amber-50 text-amber-700 border border-amber-100' 
+                                  : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                            }`}>
+                              {item.remaining} left
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between text-[8px] text-slate-400 font-semibold mb-1">
+                            <span>Limit: <strong className="text-slate-600">{item.initial}</strong></span>
+                            <span>Applied: <strong className="text-slate-600">{item.applied}</strong></span>
+                          </div>
+
+                          {/* Mini Progress Bar */}
+                          <div className="w-full bg-slate-200/50 h-1 rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full rounded-full transition-all duration-300 ${
+                                isOver ? 'bg-rose-500' : isLow ? 'bg-amber-500' : 'bg-emerald-500'
+                              }`}
+                              style={{ width: `${Math.min(100, usagePercent)}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+
           </div>
 
         </div>
