@@ -1513,7 +1513,7 @@ app.put("/api/tickets/:id/documents", authenticateToken, async (req: any, res: a
     if (other_invoice_date !== undefined) updateData.other_invoice_date = other_invoice_date;
 
     const mergedFlightStatus = ticket?.flight_status;
-    if (['NO_SHOW', 'CANCELLED', 'RESCHEDULED'].includes(mergedFlightStatus)) {
+    if (['NO_SHOW', 'RESCHEDULED'].includes(mergedFlightStatus)) {
       const mergedInvoiceNumber = other_invoice_number !== undefined ? other_invoice_number : (ticket?.other_invoice_number || '');
       const isCompletedNow = !!(mergedInvoiceNumber && mergedInvoiceNumber.trim());
       updateData.stage2_completed = isCompletedNow;
@@ -1728,7 +1728,7 @@ app.put("/api/tickets/:id/stage2", authenticateToken, async (req: any, res: any)
     }
 
     const u = req.body;
-    const isSecondAttemptActive = ['NO_SHOW', 'CANCELLED', 'RESCHEDULED'].includes(u.flight_status || ticket?.flight_status);
+    const isSecondAttemptActive = ['NO_SHOW', 'RESCHEDULED'].includes(u.flight_status || ticket?.flight_status);
     const invoiceNumber = u.other_invoice_number !== undefined ? u.other_invoice_number : (ticket?.other_invoice_number || '');
     const isStage2Completed = isSecondAttemptActive 
       ? !!(invoiceNumber && invoiceNumber.trim())
@@ -2241,7 +2241,7 @@ app.get("/api/dashboard/metrics", authenticateToken, async (req: any, res: any) 
     } else {
       update_required = tickets.filter(t => 
         ((!t.flight_status || t.flight_status === 'PENDING') && t.departure_date && t.departure_date < now) ||
-        (['NO_SHOW', 'RESCHEDULED', 'CANCELLED'].includes(t.flight_status) && (!t.rescheduled_flight_status || t.rescheduled_flight_status === 'PENDING') && t.rescheduled_departure_date && t.rescheduled_departure_date < now)
+        (['NO_SHOW', 'RESCHEDULED'].includes(t.flight_status) && (!t.rescheduled_flight_status || t.rescheduled_flight_status === 'PENDING') && t.rescheduled_departure_date && t.rescheduled_departure_date < now)
       ).length;
     }
     

@@ -212,7 +212,7 @@ export default function UpdateFlightStatusModal({ ticket, isOpen, onClose, onSuc
             </div>
           </div>
           
-          {['NO_SHOW', 'CANCELLED', 'RESCHEDULED'].includes(formData.flight_status) && (
+          {['NO_SHOW', 'RESCHEDULED'].includes(formData.flight_status) && (
             <div className="mt-4 p-4 border border-orange-300 rounded-xl shadow-lg bg-orange-500/5 animate-flash-grow">
               <h4 className="text-sm font-extrabold uppercase tracking-widest mb-3 border-b border-orange-200 pb-1.5" style={{ color: '#d84315' }}>
                 Re-booking / Cancellation Details

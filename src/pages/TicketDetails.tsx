@@ -725,7 +725,7 @@ export default function TicketDetails() {
                       <p className="mt-2 text-xs text-orange-600">Flight Status and Actual Arrival Date can be updated after the departure date.</p>
                     )}
 
-                    {['NO_SHOW', 'CANCELLED', 'RESCHEDULED'].includes(stage2Data.flight_status) && (
+                    {['NO_SHOW', 'RESCHEDULED'].includes(stage2Data.flight_status) && (
                       <div className="mt-4 p-4 border border-orange-300 rounded-xl shadow-lg bg-orange-500/5 animate-flash-grow">
                         <h4 className="text-sm font-extrabold uppercase tracking-widest mb-3 border-b border-orange-200 pb-1.5" style={{ color: '#d84315' }}>
                           Re-booking / Cancellation Details
@@ -1214,7 +1214,7 @@ export default function TicketDetails() {
                   </span>
                 </h3>
                 
-                {['NO_SHOW', 'CANCELLED', 'RESCHEDULED'].includes(ticketData.flight_status) ? (
+                {['NO_SHOW', 'RESCHEDULED'].includes(ticketData.flight_status) ? (
                   <div className="bg-white p-4 rounded-lg border border-slate-100 shadow-sm flex flex-col justify-between min-h-[140px]">
                     <div>
                       <div className="flex items-start justify-between">

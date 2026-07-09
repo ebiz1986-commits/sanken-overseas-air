@@ -610,7 +610,12 @@ export default function Dashboard() {
     });
 
     const uniquePassengers = new Set(tickets.map(t => t.passenger_name?.trim()).filter(Boolean));
-    const noShowCount = tickets.filter(t => t.flight_status === 'NO_SHOW' || t.rescheduled_flight_status === 'NO_SHOW').length;
+    const noShowCount = tickets.filter(t => 
+      t.flight_status === 'NO_SHOW' || 
+      t.rescheduled_flight_status === 'NO_SHOW' || 
+      t.flight_status === 'CANCELLED' || 
+      t.rescheduled_flight_status === 'CANCELLED'
+    ).length;
 
     const statusCounts: Record<string, number> = {};
     const flightStatusCounts: Record<string, number> = {};
@@ -1433,8 +1438,11 @@ export default function Dashboard() {
       if (allTicketsSubTab === 'NO_ISSUE') {
         matchesSubTab = t.flight_status === 'DEPARTED' && !isInvoicePending(t);
       } else if (allTicketsSubTab === 'MISSED') {
-        // Appears here after the first NO_SHOW, and also after second NO_SHOW
-        matchesSubTab = (t.flight_status === 'NO_SHOW' || t.rescheduled_flight_status === 'NO_SHOW' ||
+        // Appears here after the first NO_SHOW, and also after second NO_SHOW, and also if cancelled
+        matchesSubTab = (t.flight_status === 'NO_SHOW' || 
+                        t.rescheduled_flight_status === 'NO_SHOW' ||
+                        t.flight_status === 'CANCELLED' || 
+                        t.rescheduled_flight_status === 'CANCELLED' ||
                         (['RESCHEDULED', 'CANCELLED'].includes(t.flight_status) && t.rescheduled_flight_status === 'DEPARTED')) && !isInvoicePending(t);
       } else if (allTicketsSubTab === 'UPDATE_REQUIRED') {
         if (role === 'FINANCE') {
@@ -1448,8 +1456,10 @@ export default function Dashboard() {
           matchesSubTab = (firstFlightUpdate || secondFlightUpdate) && !isInvoicePending(t);
         }
       } else if (allTicketsSubTab === 'DANGER_ZONE') {
-        // Appears here only if both initial and rescheduled flight statuses are NO_SHOW (second no-show)
-        matchesSubTab = t.flight_status === 'NO_SHOW' && t.rescheduled_flight_status === 'NO_SHOW' && !isInvoicePending(t);
+        // Appears here if second no-show OR if flight_status / rescheduled_flight_status is CANCELLED
+        matchesSubTab = (t.flight_status === 'CANCELLED' || 
+                        t.rescheduled_flight_status === 'CANCELLED' || 
+                        (t.flight_status === 'NO_SHOW' && t.rescheduled_flight_status === 'NO_SHOW')) && !isInvoicePending(t);
       } else if (allTicketsSubTab === 'PAYMENT_DONE') {
         matchesSubTab = t.po_status === 'payment done';
       } else if (allTicketsSubTab === 'INVOICE_PENDING') {
