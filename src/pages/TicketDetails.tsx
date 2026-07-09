@@ -1364,7 +1364,7 @@ export default function TicketDetails() {
                   </div>
                 ) : (
                   <div className="bg-slate-50 border border-dashed border-slate-200 p-6 rounded-lg text-center text-xs text-slate-400 select-none font-sans">
-                    Other Attempt attachments are only available if the flying attempt status is <strong>NO SHOW, CANCELLED,</strong> or <strong>RESCHEDULED</strong>.
+                    Other Attempt attachments are only available if the flying attempt status is <strong>NO SHOW</strong> or <strong>RESCHEDULED</strong>.
                   </div>
                 )}
               </div>

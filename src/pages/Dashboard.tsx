@@ -279,7 +279,7 @@ export const renderFlightStatusBadge = (flight_status: string | null, departure_
 const isInvoicePending = (t: any) => {
   if (!t) return false;
   const isFirstAttemptPending = !t.first_invoice_number || !t.first_invoice_number.trim();
-  const isSecondAttemptActive = ['NO_SHOW', 'CANCELLED', 'RESCHEDULED'].includes(t.flight_status);
+  const isSecondAttemptActive = ['NO_SHOW', 'RESCHEDULED'].includes(t.flight_status);
   const isSecondAttemptPending = isSecondAttemptActive && (!t.other_invoice_number || !t.other_invoice_number.trim());
   return isFirstAttemptPending || isSecondAttemptPending;
 };
@@ -566,7 +566,7 @@ export default function Dashboard() {
       } else {
         const firstFlightUpdate = (!t.flight_status || t.flight_status === 'PENDING') && 
                         (t.departure_date && t.departure_date < todayStr);
-        const secondFlightUpdate = ['NO_SHOW', 'RESCHEDULED', 'CANCELLED'].includes(t.flight_status) &&
+        const secondFlightUpdate = ['NO_SHOW', 'RESCHEDULED'].includes(t.flight_status) &&
                         (!t.rescheduled_flight_status || t.rescheduled_flight_status === 'PENDING') &&
                         (t.rescheduled_departure_date && t.rescheduled_departure_date < todayStr);
         return (firstFlightUpdate || secondFlightUpdate) && !isInvoicePending(t);
@@ -659,7 +659,7 @@ export default function Dashboard() {
       let isInvPending = false;
       if (isInvoicePending(t)) {
         const isFirstPending = !t.first_invoice_number || !t.first_invoice_number.trim();
-        const isSecondActive = ['NO_SHOW', 'CANCELLED', 'RESCHEDULED'].includes(t.flight_status);
+        const isSecondActive = ['NO_SHOW', 'RESCHEDULED'].includes(t.flight_status);
         const isSecondPending = isSecondActive && (!t.other_invoice_number || !t.other_invoice_number.trim());
 
         let amt = 0;
@@ -1450,7 +1450,7 @@ export default function Dashboard() {
         } else {
           const firstFlightUpdate = (!t.flight_status || t.flight_status === 'PENDING') && 
                           (t.departure_date && t.departure_date < format(new Date(), 'yyyy-MM-dd'));
-          const secondFlightUpdate = ['NO_SHOW', 'RESCHEDULED', 'CANCELLED'].includes(t.flight_status) &&
+          const secondFlightUpdate = ['NO_SHOW', 'RESCHEDULED'].includes(t.flight_status) &&
                           (!t.rescheduled_flight_status || t.rescheduled_flight_status === 'PENDING') &&
                           (t.rescheduled_departure_date && t.rescheduled_departure_date < format(new Date(), 'yyyy-MM-dd'));
           matchesSubTab = (firstFlightUpdate || secondFlightUpdate) && !isInvoicePending(t);
@@ -3125,7 +3125,7 @@ export default function Dashboard() {
               const docs = getTicketDocuments(t);
               return (
                 <div key={`${t.id}-${idx}`} className={`p-4 transition-colors cursor-pointer border-l-4 ${
-                  activeTab === 'ALL_TICKETS' && allTicketsSubTab === 'INVOICE_PENDING' && ['NO_SHOW', 'CANCELLED', 'RESCHEDULED'].includes(t.flight_status) && (!t.other_invoice_number || !t.other_invoice_number.trim())
+                  activeTab === 'ALL_TICKETS' && allTicketsSubTab === 'INVOICE_PENDING' && ['NO_SHOW', 'RESCHEDULED'].includes(t.flight_status) && (!t.other_invoice_number || !t.other_invoice_number.trim())
                     ? 'animate-pulse-glowing-amber border-amber-600'
                     : t.flight_status === 'NO_SHOW' || t.rescheduled_flight_status === 'NO_SHOW'
                       ? 'bg-red-50/40 hover:bg-red-50 border-red-550'
@@ -3482,7 +3482,7 @@ export default function Dashboard() {
                     <tr 
                       className={`transition-all duration-150 border-l-4 hover:shadow-[0_2px_8px_-1px_rgba(0,0,0,0.06)] hover:bg-slate-50/95 relative ${
                         activeTab === 'ALL_TICKETS' && allTicketsSubTab === 'INVOICE_PENDING' 
-                          ? (['NO_SHOW', 'CANCELLED', 'RESCHEDULED'].includes(t.flight_status) && (!t.other_invoice_number || !t.other_invoice_number.trim())
+                          ? (['NO_SHOW', 'RESCHEDULED'].includes(t.flight_status) && (!t.other_invoice_number || !t.other_invoice_number.trim())
                             ? 'animate-pulse-glowing-amber border-amber-600'
                             : 'bg-amber-50/15 hover:bg-amber-50/25 border-amber-500')
                           : activeTab === 'ALL_TICKETS' && (allTicketsSubTab === 'MISSED' || allTicketsSubTab === 'DANGER_ZONE') 
