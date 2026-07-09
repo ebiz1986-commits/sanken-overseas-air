@@ -725,32 +725,58 @@ export default function Dashboard() {
   }, [tickets]);
 
   const agentAccumulatedStats = useMemo(() => {
-    const stats: Record<string, { count: number; cost: number }> = {};
+    const stats: Record<string, { count: number; cost: number; count7d: number; cost7d: number }> = {};
     
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    const isWithin7Days = (dateStr: any) => {
+      if (!dateStr) return false;
+      const d = new Date(dateStr);
+      return !isNaN(d.getTime()) && d >= sevenDaysAgo;
+    };
+
     (tickets || []).forEach(t => {
       if (t.travel_agent && String(t.travel_agent).trim()) {
         const agent = String(t.travel_agent).trim();
         if (!stats[agent]) {
-          stats[agent] = { count: 0, cost: 0 };
+          stats[agent] = { count: 0, cost: 0, count7d: 0, cost7d: 0 };
         }
         stats[agent].count += 1;
-        stats[agent].cost += Number(t.approved_rate) || Number(t.price) || 0;
+        const rate = Number(t.approved_rate) || Number(t.price) || 0;
+        stats[agent].cost += rate;
+
+        const tDate = t.ticket_arranged_date || t.departure_date || t.created_at;
+        if (isWithin7Days(tDate)) {
+          stats[agent].count7d += 1;
+          stats[agent].cost7d += rate;
+        }
       }
       
       if (t.rescheduled_ticket_agent && String(t.rescheduled_ticket_agent).trim()) {
         const rAgent = String(t.rescheduled_ticket_agent).trim();
         if (!stats[rAgent]) {
-          stats[rAgent] = { count: 0, cost: 0 };
+          stats[rAgent] = { count: 0, cost: 0, count7d: 0, cost7d: 0 };
         }
         stats[rAgent].count += 1;
-        stats[rAgent].cost += Number(t.rescheduled_ticket_amount) || 0;
+        const rRate = Number(t.rescheduled_ticket_amount) || 0;
+        stats[rAgent].cost += rRate;
+
+        const rDate = t.rescheduled_ticket_date || t.rescheduled_departure_date || t.ticket_arranged_date || t.departure_date || t.created_at;
+        if (isWithin7Days(rDate)) {
+          stats[rAgent].count7d += 1;
+          stats[rAgent].cost7d += rRate;
+        }
       }
     });
 
     return Object.entries(stats).map(([agent, data]) => ({
       agent,
       count: data.count,
-      cost: data.cost
+      cost: data.cost,
+      count7d: data.count7d,
+      cost7d: data.cost7d
     })).sort((a, b) => b.cost - a.cost);
   }, [tickets]);
 
@@ -1747,8 +1773,8 @@ export default function Dashboard() {
               </div>
               
               <div className="space-y-2.5">
-                {agentAccumulatedStats.map(({ agent, count, cost }, idx) => {
-                  const averagePrice = count > 0 ? cost / count : 0;
+                {agentAccumulatedStats.map(({ agent, count, cost, count7d, cost7d }, idx) => {
+                  const averagePrice7d = count7d > 0 ? cost7d / count7d : 0;
                   const totalTickets = dashboardTopSummary.totalTicketsCount || 1;
                   const ticketShare = (count / totalTickets) * 100;
 
@@ -1764,7 +1790,7 @@ export default function Dashboard() {
                       
                       <div className="flex justify-between items-center text-[10px] text-slate-500 font-semibold mb-1">
                         <div className="flex gap-2">
-                          <span>Avg: <strong className="text-slate-750">${Math.round(averagePrice).toLocaleString()}</strong></span>
+                          <span>Avg (Last 7 Days): <strong className="text-slate-750">{averagePrice7d > 0 ? `$${Math.round(averagePrice7d).toLocaleString()}` : 'N/A'}</strong></span>
                           <span>•</span>
                           <span>Share: <strong className="text-slate-750">{ticketShare.toFixed(0)}%</strong></span>
                         </div>
@@ -1845,29 +1871,29 @@ export default function Dashboard() {
                   <div className="flex justify-between items-center mb-2 pb-1.5 border-b border-slate-100">
                     <div className="flex items-center gap-1">
                       <FileText className="w-3.5 h-3.5 text-sky-500" />
-                      <span className="text-[10px] font-extrabold text-slate-800 uppercase tracking-wider block">Invoices Pending</span>
+                      <span className="text-[11px] font-extrabold text-slate-800 uppercase tracking-wider block">Invoices Pending</span>
                     </div>
-                    <span className="text-[9px] font-bold text-sky-700 bg-sky-50 border border-sky-100 px-1.5 py-0.5 rounded-full leading-none">
+                    <span className="text-[10px] font-bold text-sky-700 bg-sky-50 border border-sky-100 px-1.5 py-0.5 rounded-full leading-none">
                       {financialSummary.invoicePendingCount} Items
                     </span>
                   </div>
                   
                   {/* Total amount header */}
                   <div className="flex justify-between items-center mb-2 bg-slate-50/70 border border-slate-200/30 p-1.5 rounded-lg">
-                    <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Total Value:</span>
+                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Total Value:</span>
                     <div className="text-right flex flex-col items-end">
                       {financialSummary.invoicePendingUSD > 0 && (
-                        <span className="text-xs font-black text-slate-800 leading-none">
+                        <span className="text-sm font-black text-slate-800 leading-none">
                           ${financialSummary.invoicePendingUSD.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                         </span>
                       )}
                       {financialSummary.invoicePendingLKR > 0 && (
-                        <span className="text-[9px] font-extrabold text-slate-500 leading-none mt-0.5">
+                        <span className="text-[10.5px] font-extrabold text-slate-500 leading-none mt-0.5">
                           LKR {financialSummary.invoicePendingLKR.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                         </span>
                       )}
                       {financialSummary.invoicePendingUSD === 0 && financialSummary.invoicePendingLKR === 0 && (
-                        <span className="text-[10px] font-bold text-slate-400 leading-none">None</span>
+                        <span className="text-xs font-bold text-slate-400 leading-none">None</span>
                       )}
                     </div>
                   </div>
@@ -1875,7 +1901,7 @@ export default function Dashboard() {
                   {/* List of Agents with Counts */}
                   <div className="space-y-1 max-h-[110px] overflow-y-auto pr-1 scrollbar-thin">
                     {(Object.entries(financialSummary.invoicePendingByAgent) as [string, { USD: number; LKR: number; count: number }][]).filter(([_, val]) => val.count > 0).length === 0 ? (
-                      <div className="text-center text-[9px] text-slate-400 py-3 italic">
+                      <div className="text-center text-[10px] text-slate-400 py-3 italic">
                         No pending invoices.
                       </div>
                     ) : (
@@ -1886,14 +1912,14 @@ export default function Dashboard() {
                           return (
                             <div key={`${agent}-${idx}`} className="flex items-center justify-between bg-slate-50/50 hover:bg-slate-50 border border-slate-200/30 p-1 rounded-lg transition-colors">
                               <div className="truncate pr-1.5">
-                                <p className="text-[9px] font-extrabold text-slate-800 truncate" title={agent}>{agent}</p>
-                                <p className="text-[8px] font-semibold text-slate-400 mt-0.5 leading-none">
+                                <p className="text-[10px] font-extrabold text-slate-800 truncate" title={agent}>{agent}</p>
+                                <p className="text-[9px] font-semibold text-slate-400 mt-0.5 leading-none">
                                   {amt.USD > 0 && `$${Math.round(amt.USD).toLocaleString()}`}
                                   {amt.USD > 0 && amt.LKR > 0 && ' • '}
                                   {amt.LKR > 0 && `LKR ${Math.round(amt.LKR).toLocaleString()}`}
                                 </p>
                               </div>
-                              <span className="shrink-0 text-[8px] font-black text-sky-700 bg-sky-50 border border-sky-100 px-1 py-0.5 rounded-md font-mono">
+                              <span className="shrink-0 text-[9px] font-black text-sky-700 bg-sky-50 border border-sky-100 px-1 py-0.5 rounded-md font-mono">
                                 {amt.count} {amt.count === 1 ? 'Inv' : 'Invs'}
                               </span>
                             </div>
@@ -1910,29 +1936,29 @@ export default function Dashboard() {
                   <div className="flex justify-between items-center mb-2 pb-1.5 border-b border-slate-100">
                     <div className="flex items-center gap-1">
                       <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
-                      <span className="text-[10px] font-extrabold text-slate-800 uppercase tracking-wider block">POs Pending</span>
+                      <span className="text-[11px] font-extrabold text-slate-800 uppercase tracking-wider block">POs Pending</span>
                     </div>
-                    <span className="text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded-full leading-none">
+                    <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded-full leading-none">
                       {financialSummary.poPendingCount} Items
                     </span>
                   </div>
                   
                   {/* Total amount header */}
                   <div className="flex justify-between items-center mb-2 bg-amber-50/30 border border-amber-100/70 p-1.5 rounded-lg">
-                    <span className="text-[9px] font-extrabold text-amber-700/80 uppercase tracking-wider">Total Value:</span>
+                    <span className="text-[10px] font-extrabold text-amber-700/80 uppercase tracking-wider">Total Value:</span>
                     <div className="text-right flex flex-col items-end">
                       {financialSummary.poPendingUSD > 0 && (
-                        <span className="text-xs font-black text-amber-600 leading-none">
+                        <span className="text-sm font-black text-amber-600 leading-none">
                           ${financialSummary.poPendingUSD.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                         </span>
                       )}
                       {financialSummary.poPendingLKR > 0 && (
-                        <span className="text-[9px] font-extrabold text-amber-500 leading-none mt-0.5">
+                        <span className="text-[10.5px] font-extrabold text-amber-500 leading-none mt-0.5">
                           LKR {financialSummary.poPendingLKR.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                         </span>
                       )}
                       {financialSummary.poPendingUSD === 0 && financialSummary.poPendingLKR === 0 && (
-                        <span className="text-[10px] font-bold text-slate-400 leading-none">None</span>
+                        <span className="text-xs font-bold text-slate-400 leading-none">None</span>
                       )}
                     </div>
                   </div>
@@ -1940,7 +1966,7 @@ export default function Dashboard() {
                   {/* List of Agents with Counts */}
                   <div className="space-y-1 max-h-[110px] overflow-y-auto pr-1 scrollbar-thin">
                     {(Object.entries(financialSummary.poPendingByAgent) as [string, { USD: number; LKR: number; count: number }][]).filter(([_, val]) => val.count > 0).length === 0 ? (
-                      <div className="text-center text-[9px] text-slate-400 py-3 italic">
+                      <div className="text-center text-[10px] text-slate-400 py-3 italic">
                         No pending POs.
                       </div>
                     ) : (
@@ -1951,14 +1977,14 @@ export default function Dashboard() {
                           return (
                             <div key={`${agent}-${idx}`} className="flex items-center justify-between bg-slate-50/50 hover:bg-slate-50 border border-slate-200/30 p-1 rounded-lg transition-colors">
                               <div className="truncate pr-1.5">
-                                <p className="text-[9px] font-extrabold text-slate-800 truncate" title={agent}>{agent}</p>
-                                <p className="text-[8px] font-semibold text-slate-400 mt-0.5 leading-none">
+                                <p className="text-[10px] font-extrabold text-slate-800 truncate" title={agent}>{agent}</p>
+                                <p className="text-[9px] font-semibold text-slate-400 mt-0.5 leading-none">
                                   {amt.USD > 0 && `$${Math.round(amt.USD).toLocaleString()}`}
                                   {amt.USD > 0 && amt.LKR > 0 && ' • '}
                                   {amt.LKR > 0 && `LKR ${Math.round(amt.LKR).toLocaleString()}`}
                                 </p>
                               </div>
-                              <span className="shrink-0 text-[8px] font-black text-amber-700 bg-amber-50 border border-amber-100 px-1 py-0.5 rounded-md font-mono">
+                              <span className="shrink-0 text-[9px] font-black text-amber-700 bg-amber-50 border border-amber-100 px-1 py-0.5 rounded-md font-mono">
                                 {amt.count} {amt.count === 1 ? 'PO' : 'POs'}
                               </span>
                             </div>
