@@ -1827,162 +1827,131 @@ export default function Dashboard() {
               </motion.div>
             </div>
 
-            {/* Invoice & PO Pending compact cards */}
-            <div className="grid grid-cols-2 gap-2">
-              {/* Invoice Pending */}
-              <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-2.5 flex flex-col justify-between min-h-[95px]">
-                <div>
-                  <div className="flex justify-between items-start mb-0.5">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Invoice Pending</span>
-                    <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.25 rounded-full leading-none">
-                      {financialSummary.invoicePendingCount}
-                    </span>
+            {/* Invoice Pending by Agent Card */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4.5 flex flex-col justify-between min-h-[220px]">
+              <div>
+                <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-sky-500" />
+                    <span className="text-[11px] font-extrabold text-slate-800 uppercase tracking-widest block">Invoices Pending</span>
                   </div>
-                  <div className="flex flex-col">
+                  <span className="text-[10px] font-bold text-sky-700 bg-sky-50 border border-sky-100 px-2 py-0.5 rounded-full leading-none">
+                    {financialSummary.invoicePendingCount} Items
+                  </span>
+                </div>
+                
+                {/* Total amount header */}
+                <div className="flex justify-between items-center mb-3 bg-slate-50/70 border border-slate-200/40 p-2 rounded-xl">
+                  <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Total Value:</span>
+                  <div className="text-right flex flex-col items-end">
                     {financialSummary.invoicePendingUSD > 0 && (
-                      <span className="text-xs font-extrabold text-slate-800 leading-none">
+                      <span className="text-sm font-black text-slate-800 leading-none">
                         ${financialSummary.invoicePendingUSD.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                       </span>
                     )}
                     {financialSummary.invoicePendingLKR > 0 && (
-                      <span className="text-[10px] font-bold text-slate-600 leading-none mt-0.5">
+                      <span className="text-[10px] font-extrabold text-slate-500 leading-none mt-0.5">
                         LKR {financialSummary.invoicePendingLKR.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                       </span>
                     )}
                     {financialSummary.invoicePendingUSD === 0 && financialSummary.invoicePendingLKR === 0 && (
-                      <span className="text-[10px] font-bold text-slate-400 leading-none">None</span>
+                      <span className="text-xs font-bold text-slate-400 leading-none">None</span>
                     )}
                   </div>
                 </div>
-                {Object.entries(financialSummary.invoicePendingByAgent).length > 0 && (
-                  <div className="mt-1 pt-1 border-t border-slate-100 flex flex-col gap-0.5 max-h-[35px] overflow-y-auto scrollbar-thin">
-                    {Object.entries(financialSummary.invoicePendingByAgent).map(([agent, val], idx) => {
-                      const amt = val as { USD: number; LKR: number; count: number };
-                      const hasUSD = amt.USD > 0;
-                      const hasLKR = amt.LKR > 0;
-                      if (!hasUSD && !hasLKR) return null;
-                      return (
-                        <div key={`${agent}-${idx}`} className="flex justify-between items-center text-[8px] leading-tight text-slate-500 font-medium truncate">
-                          <span className="truncate max-w-[55px]" title={agent}>
-                            {agent}
-                          </span>
-                          <span className="font-semibold text-slate-700 shrink-0">
-                            {hasUSD && `$${Math.round(amt.USD).toLocaleString()}`}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
 
-              {/* PO Pending */}
-              <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-2.5 flex flex-col justify-between min-h-[95px]">
-                <div>
-                  <div className="flex justify-between items-start mb-0.5">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">PO Pending</span>
-                    <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.25 rounded-full leading-none border border-amber-100 animate-pulse-slow">
-                      {financialSummary.poPendingCount}
-                    </span>
+                {/* List of Agents with Counts */}
+                <div className="space-y-1.5 max-h-[145px] overflow-y-auto pr-1 scrollbar-thin">
+                  {(Object.entries(financialSummary.invoicePendingByAgent) as [string, { USD: number; LKR: number; count: number }][]).filter(([_, val]) => val.count > 0).length === 0 ? (
+                    <div className="text-center text-[10px] text-slate-400 py-4 italic">
+                      No pending invoices.
+                    </div>
+                  ) : (
+                    (Object.entries(financialSummary.invoicePendingByAgent) as [string, { USD: number; LKR: number; count: number }][])
+                      .filter(([_, val]) => val.count > 0)
+                      .sort((a, b) => b[1].count - a[1].count)
+                      .map(([agent, amt], idx) => {
+                        return (
+                          <div key={`${agent}-${idx}`} className="flex items-center justify-between bg-slate-50/50 hover:bg-slate-50 border border-slate-200/30 p-1.5 rounded-lg transition-colors">
+                            <div className="truncate pr-2">
+                              <p className="text-[10px] font-extrabold text-slate-800 truncate" title={agent}>{agent}</p>
+                              <p className="text-[8px] font-semibold text-slate-400 mt-0.5 leading-none">
+                                {amt.USD > 0 && `$${Math.round(amt.USD).toLocaleString()}`}
+                                {amt.USD > 0 && amt.LKR > 0 && ' • '}
+                                {amt.LKR > 0 && `LKR ${Math.round(amt.LKR).toLocaleString()}`}
+                              </p>
+                            </div>
+                            <span className="shrink-0 text-[10px] font-black text-sky-700 bg-sky-50 border border-sky-100 px-2 py-0.5 rounded-md font-mono">
+                              {amt.count} {amt.count === 1 ? 'Inv' : 'Invs'}
+                            </span>
+                          </div>
+                        );
+                      })
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* PO Pending by Agent Card */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4.5 flex flex-col justify-between min-h-[220px]">
+              <div>
+                <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4 text-amber-500" />
+                    <span className="text-[11px] font-extrabold text-slate-800 uppercase tracking-widest block">POs Pending</span>
                   </div>
-                  <div className="flex flex-col">
+                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full leading-none">
+                    {financialSummary.poPendingCount} Items
+                  </span>
+                </div>
+                
+                {/* Total amount header */}
+                <div className="flex justify-between items-center mb-3 bg-amber-50/30 border border-amber-100 p-2 rounded-xl">
+                  <span className="text-[10px] font-extrabold text-amber-700/80 uppercase tracking-wider">Total Value:</span>
+                  <div className="text-right flex flex-col items-end">
                     {financialSummary.poPendingUSD > 0 && (
-                      <span className="text-xs font-extrabold text-amber-600 leading-none">
+                      <span className="text-sm font-black text-amber-600 leading-none">
                         ${financialSummary.poPendingUSD.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                       </span>
                     )}
                     {financialSummary.poPendingLKR > 0 && (
-                      <span className="text-[10px] font-bold text-amber-500 leading-none mt-0.5">
+                      <span className="text-[10px] font-extrabold text-amber-500 leading-none mt-0.5">
                         LKR {financialSummary.poPendingLKR.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                       </span>
                     )}
                     {financialSummary.poPendingUSD === 0 && financialSummary.poPendingLKR === 0 && (
-                      <span className="text-[10px] font-bold text-slate-400 leading-none">None</span>
+                      <span className="text-xs font-bold text-slate-400 leading-none">None</span>
                     )}
                   </div>
                 </div>
-                {Object.entries(financialSummary.poPendingByAgent).length > 0 && (
-                  <div className="mt-1 pt-1 border-t border-slate-100 flex flex-col gap-0.5 max-h-[35px] overflow-y-auto scrollbar-thin">
-                    {Object.entries(financialSummary.poPendingByAgent).map(([agent, val], idx) => {
-                      const amt = val as { USD: number; LKR: number; count: number };
-                      const hasUSD = amt.USD > 0;
-                      const hasLKR = amt.LKR > 0;
-                      if (!hasUSD && !hasLKR) return null;
-                      return (
-                        <div key={`${agent}-${idx}`} className="flex justify-between items-center text-[8px] leading-tight text-slate-500 font-medium truncate">
-                          <span className="truncate max-w-[55px]" title={agent}>
-                            {agent}
-                          </span>
-                          <span className="font-semibold text-amber-600 shrink-0">
-                            {hasUSD && `$${Math.round(amt.USD).toLocaleString()}`}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
 
-            {/* NEW: Sub-contractor Ticket Entitlements Summary (Shorter Version) */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between flex-1 min-h-[160px]">
-              <div>
-                <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-slate-150">
-                  <h3 className="text-[11px] font-extrabold text-slate-800 uppercase tracking-widest flex items-center gap-1.5">
-                    <Award className="w-3.5 h-3.5 text-sky-500" />
-                    Sub-contractor Entitlements
-                  </h3>
-                  <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-md font-mono font-bold">
-                    {subcontractorEntitlementsData.length} items
-                  </span>
-                </div>
-
-                <div className="space-y-2 max-h-[135px] overflow-y-auto pr-1 scrollbar-thin">
-                  {subcontractorEntitlementsData.length === 0 ? (
+                {/* List of Agents with Counts */}
+                <div className="space-y-1.5 max-h-[145px] overflow-y-auto pr-1 scrollbar-thin">
+                  {(Object.entries(financialSummary.poPendingByAgent) as [string, { USD: number; LKR: number; count: number }][]).filter(([_, val]) => val.count > 0).length === 0 ? (
                     <div className="text-center text-[10px] text-slate-400 py-4 italic">
-                      No subcontractor entitlements configured.
+                      No pending POs.
                     </div>
                   ) : (
-                    subcontractorEntitlementsData.slice(0, 5).map((item, idx) => {
-                      const usagePercent = item.initial > 0 ? (item.applied / item.initial) * 100 : 0;
-                      const isOver = item.remaining < 0;
-                      const isLow = !isOver && item.remaining <= 3;
-                      
-                      return (
-                        <div key={`${item.projectId}-${item.company}-${idx}`} className="flex flex-col bg-slate-50/50 hover:bg-slate-50 border border-slate-200/40 p-1.5 rounded-lg transition-colors">
-                          <div className="flex justify-between items-start mb-0.5">
-                            <div className="truncate max-w-[150px]">
-                              <p className="text-[10px] font-extrabold text-slate-850 truncate leading-tight" title={item.projectName}>{item.projectName}</p>
-                              <p className="text-[8px] font-semibold text-slate-400 truncate leading-none mt-0.5">{item.company}</p>
+                    (Object.entries(financialSummary.poPendingByAgent) as [string, { USD: number; LKR: number; count: number }][])
+                      .filter(([_, val]) => val.count > 0)
+                      .sort((a, b) => b[1].count - a[1].count)
+                      .map(([agent, amt], idx) => {
+                        return (
+                          <div key={`${agent}-${idx}`} className="flex items-center justify-between bg-slate-50/50 hover:bg-slate-50 border border-slate-200/30 p-1.5 rounded-lg transition-colors">
+                            <div className="truncate pr-2">
+                              <p className="text-[10px] font-extrabold text-slate-800 truncate" title={agent}>{agent}</p>
+                              <p className="text-[8px] font-semibold text-slate-400 mt-0.5 leading-none">
+                                {amt.USD > 0 && `$${Math.round(amt.USD).toLocaleString()}`}
+                                {amt.USD > 0 && amt.LKR > 0 && ' • '}
+                                {amt.LKR > 0 && `LKR ${Math.round(amt.LKR).toLocaleString()}`}
+                              </p>
                             </div>
-                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full font-mono ${
-                              isOver 
-                                ? 'bg-rose-50 text-rose-700 border border-rose-100' 
-                                : isLow 
-                                  ? 'bg-amber-50 text-amber-700 border border-amber-100' 
-                                  : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                            }`}>
-                              {item.remaining} left
+                            <span className="shrink-0 text-[10px] font-black text-amber-700 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-md font-mono">
+                              {amt.count} {amt.count === 1 ? 'PO' : 'POs'}
                             </span>
                           </div>
-
-                          <div className="flex items-center justify-between text-[8px] text-slate-400 font-semibold mb-1">
-                            <span>Limit: <strong className="text-slate-600">{item.initial}</strong></span>
-                            <span>Applied: <strong className="text-slate-600">{item.applied}</strong></span>
-                          </div>
-
-                          {/* Mini Progress Bar */}
-                          <div className="w-full bg-slate-200/50 h-1 rounded-full overflow-hidden">
-                            <div 
-                              className={`h-full rounded-full transition-all duration-300 ${
-                                isOver ? 'bg-rose-500' : isLow ? 'bg-amber-500' : 'bg-emerald-500'
-                              }`}
-                              style={{ width: `${Math.min(100, usagePercent)}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      );
-                    })
+                        );
+                      })
                   )}
                 </div>
               </div>
