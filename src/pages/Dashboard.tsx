@@ -617,6 +617,33 @@ export default function Dashboard() {
       t.rescheduled_flight_status === 'CANCELLED'
     ).length;
 
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+    const noShowCount30Days = tickets.filter(t => {
+      const isNoShowOrCancelled = (
+        t.flight_status === 'NO_SHOW' || 
+        t.rescheduled_flight_status === 'NO_SHOW' ||
+        t.flight_status === 'CANCELLED' || 
+        t.rescheduled_flight_status === 'CANCELLED' ||
+        (['RESCHEDULED', 'CANCELLED'].includes(t.flight_status) && t.rescheduled_flight_status === 'DEPARTED')
+      );
+      if (!isNoShowOrCancelled) return false;
+
+      // Exclude invoice pending to match MISSED subtab list
+      if (isInvoicePending(t)) return false;
+
+      const dateVal = t.departure_date || t.rescheduled_departure_date || t.created_at;
+      if (!dateVal) return false;
+      try {
+        const d = new Date(dateVal);
+        return !isNaN(d.getTime()) && d >= thirtyDaysAgo && d <= now;
+      } catch {
+        return false;
+      }
+    }).length;
+
     const statusCounts: Record<string, number> = {};
     const flightStatusCounts: Record<string, number> = {};
     tickets.forEach(ticket => {
@@ -634,12 +661,15 @@ export default function Dashboard() {
       allInvoicesCount: allInvoices.size,
       passengersCount: uniquePassengers.size,
       noShowCount,
+      noShowCount30Days,
       statusCounts,
       flightStatusCounts,
       totalTicketsCount: tickets.length,
       updatingSince
     };
   }, [tickets]);
+
+  const noShowCount30Days = dashboardTopSummary?.noShowCount30Days || 0;
 
   const financialSummary = useMemo(() => {
     let invoicePendingUSD = 0;
@@ -725,7 +755,15 @@ export default function Dashboard() {
   }, [tickets]);
 
   const agentAccumulatedStats = useMemo(() => {
-    const stats: Record<string, { count: number; cost: number; count7d: number; cost7d: number }> = {};
+    const stats: Record<string, { 
+      count: number; 
+      costUSD: number; 
+      costLKR: number; 
+      count7dUSD: number;
+      count7dLKR: number;
+      cost7dUSD: number; 
+      cost7dLKR: number;
+    }> = {};
     
     const now = new Date();
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -738,35 +776,54 @@ export default function Dashboard() {
     };
 
     (tickets || []).forEach(t => {
+      const isLKR = t.currency === 'LKR';
       if (t.travel_agent && String(t.travel_agent).trim()) {
         const agent = String(t.travel_agent).trim();
         if (!stats[agent]) {
-          stats[agent] = { count: 0, cost: 0, count7d: 0, cost7d: 0 };
+          stats[agent] = { count: 0, costUSD: 0, costLKR: 0, count7dUSD: 0, count7dLKR: 0, cost7dUSD: 0, cost7dLKR: 0 };
         }
         stats[agent].count += 1;
         const rate = Number(t.approved_rate) || Number(t.price) || 0;
-        stats[agent].cost += rate;
+        if (isLKR) {
+          stats[agent].costLKR += rate;
+        } else {
+          stats[agent].costUSD += rate;
+        }
 
         const tDate = t.ticket_arranged_date || t.departure_date || t.created_at;
         if (isWithin7Days(tDate)) {
-          stats[agent].count7d += 1;
-          stats[agent].cost7d += rate;
+          if (isLKR) {
+            stats[agent].count7dLKR += 1;
+            stats[agent].cost7dLKR += rate;
+          } else {
+            stats[agent].count7dUSD += 1;
+            stats[agent].cost7dUSD += rate;
+          }
         }
       }
       
       if (t.rescheduled_ticket_agent && String(t.rescheduled_ticket_agent).trim()) {
         const rAgent = String(t.rescheduled_ticket_agent).trim();
         if (!stats[rAgent]) {
-          stats[rAgent] = { count: 0, cost: 0, count7d: 0, cost7d: 0 };
+          stats[rAgent] = { count: 0, costUSD: 0, costLKR: 0, count7dUSD: 0, count7dLKR: 0, cost7dUSD: 0, cost7dLKR: 0 };
         }
         stats[rAgent].count += 1;
         const rRate = Number(t.rescheduled_ticket_amount) || 0;
-        stats[rAgent].cost += rRate;
+        if (isLKR) {
+          stats[rAgent].costLKR += rRate;
+        } else {
+          stats[rAgent].costUSD += rRate;
+        }
 
         const rDate = t.rescheduled_ticket_date || t.rescheduled_departure_date || t.ticket_arranged_date || t.departure_date || t.created_at;
         if (isWithin7Days(rDate)) {
-          stats[rAgent].count7d += 1;
-          stats[rAgent].cost7d += rRate;
+          if (isLKR) {
+            stats[rAgent].count7dLKR += 1;
+            stats[rAgent].cost7dLKR += rRate;
+          } else {
+            stats[rAgent].count7dUSD += 1;
+            stats[rAgent].cost7dUSD += rRate;
+          }
         }
       }
     });
@@ -774,10 +831,88 @@ export default function Dashboard() {
     return Object.entries(stats).map(([agent, data]) => ({
       agent,
       count: data.count,
-      cost: data.cost,
-      count7d: data.count7d,
-      cost7d: data.cost7d
-    })).sort((a, b) => b.cost - a.cost);
+      costUSD: data.costUSD,
+      costLKR: data.costLKR,
+      count7dUSD: data.count7dUSD,
+      count7dLKR: data.count7dLKR,
+      cost7dUSD: data.cost7dUSD,
+      cost7dLKR: data.cost7dLKR,
+      sortCost: data.costUSD + (data.costLKR / 300)
+    })).sort((a, b) => b.sortCost - a.sortCost);
+  }, [tickets]);
+
+  const totalAgentsStats = useMemo(() => {
+    let usd = 0;
+    let lkr = 0;
+    agentAccumulatedStats.forEach(item => {
+      usd += item.costUSD;
+      lkr += item.costLKR;
+    });
+    return { usd, lkr };
+  }, [agentAccumulatedStats]);
+
+  const ticketVolumeTrends30Days = useMemo(() => {
+    let maxDate = new Date();
+    let foundAnyDate = false;
+    
+    (tickets || []).forEach(t => {
+      const ticketDateVal = t.ticket_arranged_date || t.departure_date || t.created_at;
+      if (ticketDateVal) {
+        try {
+          const d = new Date(ticketDateVal);
+          if (!isNaN(d.getTime())) {
+            if (!foundAnyDate || d > maxDate) {
+              maxDate = d;
+              foundAnyDate = true;
+            }
+          }
+        } catch {}
+      }
+    });
+
+    const now = new Date();
+    if (maxDate > now) {
+      maxDate = now;
+    }
+
+    const data: { date: string; formattedDate: string; volume: number }[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(maxDate.getTime() - i * 24 * 60 * 60 * 1000);
+      const dateStr = format(d, 'yyyy-MM-dd');
+      const formattedDate = format(d, 'MMM dd');
+      data.push({
+        date: dateStr,
+        formattedDate,
+        volume: 0
+      });
+    }
+
+    (tickets || []).forEach(t => {
+      const ticketDateVal = t.ticket_arranged_date || t.departure_date || t.created_at;
+      if (ticketDateVal) {
+        try {
+          const tDate = new Date(ticketDateVal);
+          if (!isNaN(tDate.getTime())) {
+            const dateStr = format(tDate, 'yyyy-MM-dd');
+            const dayEntry = data.find(item => item.date === dateStr);
+            if (dayEntry) {
+              dayEntry.volume += 1;
+            }
+          }
+        } catch {}
+      }
+    });
+
+    const totalVolume30d = data.reduce((sum, item) => sum + item.volume, 0);
+    const peakVolume30d = Math.max(...data.map(item => item.volume), 0);
+
+    return {
+      chartData: data,
+      endDateLabel: format(maxDate, 'MMM dd, yyyy'),
+      startDateLabel: format(new Date(maxDate.getTime() - 29 * 24 * 60 * 60 * 1000), 'MMM dd, yyyy'),
+      totalVolume30d,
+      peakVolume30d
+    };
   }, [tickets]);
 
   const pricingIntelligence = useMemo(() => {
@@ -1464,12 +1599,30 @@ export default function Dashboard() {
       if (allTicketsSubTab === 'NO_ISSUE') {
         matchesSubTab = t.flight_status === 'DEPARTED' && !isInvoicePending(t);
       } else if (allTicketsSubTab === 'MISSED') {
-        // Appears here after the first NO_SHOW, and also after second NO_SHOW, and also if cancelled
-        matchesSubTab = (t.flight_status === 'NO_SHOW' || 
+        // Appears here after the first NO_SHOW, and also after second NO_SHOW, and also if cancelled (within last 30 days)
+        const isMissed = (t.flight_status === 'NO_SHOW' || 
                         t.rescheduled_flight_status === 'NO_SHOW' ||
                         t.flight_status === 'CANCELLED' || 
                         t.rescheduled_flight_status === 'CANCELLED' ||
                         (['RESCHEDULED', 'CANCELLED'].includes(t.flight_status) && t.rescheduled_flight_status === 'DEPARTED')) && !isInvoicePending(t);
+        if (!isMissed) {
+          matchesSubTab = false;
+        } else {
+          const now = new Date();
+          const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          thirtyDaysAgo.setHours(0, 0, 0, 0);
+          const dateVal = t.departure_date || t.rescheduled_departure_date || t.created_at;
+          if (!dateVal) {
+            matchesSubTab = false;
+          } else {
+            try {
+              const d = new Date(dateVal);
+              matchesSubTab = !isNaN(d.getTime()) && d >= thirtyDaysAgo && d <= now;
+            } catch {
+              matchesSubTab = false;
+            }
+          }
+        }
       } else if (allTicketsSubTab === 'UPDATE_REQUIRED') {
         if (role === 'FINANCE') {
           matchesSubTab = t.stage2_completed && !t.stage3_completed && t.flight_status !== 'PENDING';
@@ -1756,49 +1909,86 @@ export default function Dashboard() {
             initial={{ opacity: 0, y: 15 }} 
             animate={{ opacity: 1, y: 0 }} 
             transition={{ duration: 0.4, delay: 0.1 }}
-            className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col h-full justify-between"
+            className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-col h-full justify-between"
           >
             <div>
-              <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
+              <div className="flex items-start justify-between mb-3 border-b border-slate-100 pb-2">
                 <div>
-                  <h3 className="text-[12px] font-bold text-slate-850 uppercase tracking-widest flex items-center gap-2">
+                  <h3 className="text-[12px] font-bold text-slate-850 uppercase tracking-widest flex items-center gap-1.5">
                     <Users className="w-4 h-4 text-emerald-500" />
                     Ticketing Agents
                   </h3>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Performance & volume overview.</p>
+                  <div className="text-[10px] text-slate-500 mt-1 font-semibold flex flex-col gap-0.5">
+                    <span>
+                      Total: <strong className="text-emerald-700 font-black">
+                        {totalAgentsStats.usd > 0 && `$${totalAgentsStats.usd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+                        {totalAgentsStats.usd > 0 && totalAgentsStats.lkr > 0 && ' + '}
+                        {totalAgentsStats.lkr > 0 && `LKR ${totalAgentsStats.lkr.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+                        {totalAgentsStats.usd === 0 && totalAgentsStats.lkr === 0 && '$0'}
+                      </strong>
+                    </span>
+                    <span className="text-[8.5px] text-slate-400 font-medium">Since {dashboardTopSummary.updatingSince}</span>
+                  </div>
                 </div>
-                <span className="text-[10px] text-slate-400 font-bold">
+                <span className="text-[9px] text-slate-500 font-extrabold bg-slate-100 px-2 py-0.5 rounded border border-slate-200/50">
                   {agentAccumulatedStats.length} Payees
                 </span>
               </div>
               
-              <div className="space-y-2.5">
-                {agentAccumulatedStats.map(({ agent, count, cost, count7d, cost7d }, idx) => {
-                  const averagePrice7d = count7d > 0 ? cost7d / count7d : 0;
+              <div className="space-y-2">
+                {agentAccumulatedStats.map(({ agent, count, costUSD, costLKR, count7dUSD, count7dLKR, cost7dUSD, cost7dLKR }, idx) => {
+                  const avgUSD = count7dUSD > 0 ? cost7dUSD / count7dUSD : 0;
+                  const avgLKR = count7dLKR > 0 ? cost7dLKR / count7dLKR : 0;
                   const totalTickets = dashboardTopSummary.totalTicketsCount || 1;
                   const ticketShare = (count / totalTickets) * 100;
 
                   return (
                     <div 
                       key={`${agent}-${idx}`}
-                      className="flex flex-col bg-slate-50/70 border border-slate-200/50 hover:border-sky-300 p-2.5 rounded-xl transition-all"
+                      className="flex flex-col bg-slate-50/40 border border-slate-100 hover:border-slate-200 hover:bg-slate-50/80 p-2.5 rounded-xl transition-all"
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-extrabold text-slate-800 truncate max-w-[120px]" title={agent}>{agent}</span>
-                        <span className="text-xs font-black text-slate-900">{count} <span className="text-[9px] text-slate-400 font-normal uppercase">Tickets</span></span>
-                      </div>
-                      
-                      <div className="flex justify-between items-center text-[10px] text-slate-500 font-semibold mb-1">
-                        <div className="flex gap-2">
-                          <span>Avg (Last 7 Days): <strong className="text-slate-750">{averagePrice7d > 0 ? `$${Math.round(averagePrice7d).toLocaleString()}` : 'N/A'}</strong></span>
-                          <span>•</span>
-                          <span>Share: <strong className="text-slate-750">{ticketShare.toFixed(0)}%</strong></span>
+                      <div className="flex items-start justify-between">
+                        {/* Left Side: Agent name & Stats */}
+                        <div className="min-w-0 flex-1">
+                          <span className="block text-xs font-bold text-slate-800 uppercase tracking-wider truncate" title={agent}>{agent}</span>
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-slate-500 font-medium mt-1">
+                            <span>Share: <strong className="text-slate-800 font-bold">{ticketShare.toFixed(0)}%</strong></span>
+                            <span className="text-slate-300">•</span>
+                            <span>Avg (7d): <strong className="text-slate-800 font-bold">
+                              {avgUSD > 0 && `$${Math.round(avgUSD).toLocaleString()}`}
+                              {avgUSD > 0 && avgLKR > 0 && ' / '}
+                              {avgLKR > 0 && `LKR ${Math.round(avgLKR).toLocaleString()}`}
+                              {avgUSD === 0 && avgLKR === 0 && 'N/A'}
+                            </strong></span>
+                          </div>
                         </div>
-                        <span className="font-extrabold text-emerald-600">${cost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+
+                        {/* Right Side: Tickets & Arranged Cost */}
+                        <div className="text-right flex flex-col items-end justify-between min-h-[34px] pl-2 shrink-0">
+                          <span className="text-[10px] font-bold text-slate-700 leading-none">
+                            {count} <span className="text-[8px] text-slate-400 font-semibold uppercase tracking-wider">TKT</span>
+                          </span>
+                          
+                          <div className="text-right flex flex-col items-end leading-none mt-1">
+                            {costUSD > 0 && (
+                              <span className="font-extrabold text-emerald-600 text-xs">
+                                ${costUSD.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                              </span>
+                            )}
+                            {costLKR > 0 && (
+                              <span className="font-extrabold text-emerald-600 text-[10px] mt-0.5">
+                                LKR {costLKR.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                              </span>
+                            )}
+                            {costUSD === 0 && costLKR === 0 && (
+                              <span className="font-bold text-slate-400 text-[11px]">None</span>
+                            )}
+                          </div>
+                        </div>
                       </div>
 
-                      {/* Progress bar */}
-                      <div className="w-full bg-slate-200/50 h-1 rounded-full overflow-hidden">
+                      {/* Market Share Progress Bar */}
+                      <div className="w-full bg-slate-200/40 h-1 rounded-full overflow-hidden mt-2">
                         <div 
                           className="bg-emerald-500 h-full rounded-full transition-all duration-500" 
                           style={{ width: `${ticketShare}%` }}
@@ -1810,12 +2000,12 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="border-t border-slate-100 pt-3 mt-3 text-[10px] text-slate-400 flex items-center justify-between">
+            <div className="border-t border-slate-100 pt-2 mt-2 text-[9px] text-slate-400 flex items-center justify-between">
               <span className="flex items-center gap-1">
                 <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400"></span>
                 Vendor market share
               </span>
-              <span className="font-extrabold text-slate-500 font-mono text-[9px]">TOTAL ARRANGED</span>
+              <span className="font-extrabold text-slate-500 font-mono text-[8px]">TOTAL ARRANGED</span>
             </div>
           </motion.div>
 
@@ -1854,12 +2044,26 @@ export default function Dashboard() {
 
               {/* No Shows */}
               <motion.div 
-                initial={false}
-                animate={dashboardTopSummary.noShowCount > 0 ? { borderColor: '#fecaca' } : { borderColor: '#e2e8f0' }}
-                className={`bg-white rounded-xl shadow-xs border p-2 flex flex-col items-center justify-center text-center ${dashboardTopSummary.noShowCount > 0 ? 'bg-red-50/20' : ''}`}
+                animate={noShowCount30Days > 0 ? {
+                  borderColor: ["#fecaca", "#ef4444", "#fecaca"],
+                  boxShadow: ["0px 0px 0px rgba(239, 68, 68, 0)", "0px 0px 6px rgba(239, 68, 68, 0.3)", "0px 0px 0px rgba(239, 68, 68, 0)"],
+                  backgroundColor: ["#ffffff", "#fff5f5", "#ffffff"]
+                } : {
+                  borderColor: "#e2e8f0",
+                  boxShadow: "0px 0px 0px rgba(0,0,0,0)",
+                  backgroundColor: "#ffffff"
+                }}
+                transition={noShowCount30Days > 0 ? {
+                  repeat: Infinity,
+                  duration: 2,
+                  ease: "easeInOut"
+                } : undefined}
+                className="rounded-xl shadow-xs border p-2 flex flex-col items-center justify-center text-center cursor-pointer"
+                onClick={() => { setActiveTab('ALL_TICKETS'); setAllTicketsSubTab('MISSED'); }}
+                title="Click to view last 30 days missed flights"
               >
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1 text-center">No Shows</span>
-                <span className={`text-base font-black ${dashboardTopSummary.noShowCount > 0 ? 'text-red-600' : 'text-slate-800'} leading-none`}>{dashboardTopSummary.noShowCount}</span>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1 text-center">No Shows (30d)</span>
+                <span className={`text-base font-black ${noShowCount30Days > 0 ? 'text-red-600' : 'text-slate-800'} leading-none`}>{noShowCount30Days}</span>
               </motion.div>
             </div>
 
@@ -2091,24 +2295,39 @@ export default function Dashboard() {
                   <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Processed & Paid</span>
                   <span className="text-4xl font-extrabold text-emerald-600 mt-2 tracking-tight">{metrics.processed_tickets}</span>
                 </div>
-                <div 
+                <motion.div 
                   onClick={() => { setActiveTab('ALL_TICKETS'); setAllTicketsSubTab('MISSED'); }} 
-                  className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col items-start hover:border-red-300 cursor-pointer transition-all duration-300 relative overflow-hidden group"
-                  title="Click to view all missed flights"
+                  className="rounded-2xl shadow-sm border p-6 flex flex-col items-start cursor-pointer transition-all duration-300 relative overflow-hidden group"
+                  title="Click to view all last 30 days missed flights"
+                  animate={noShowCount30Days > 0 ? {
+                    borderColor: ["#fecaca", "#ef4444", "#fecaca"],
+                    boxShadow: ["0px 0px 0px rgba(239, 68, 68, 0)", "0px 0px 10px rgba(239, 68, 68, 0.4)", "0px 0px 0px rgba(239, 68, 68, 0)"],
+                    backgroundColor: ["#ffffff", "#fff5f5", "#ffffff"]
+                  } : {
+                    borderColor: "#e2e8f0",
+                    boxShadow: "0px 0px 0px rgba(0,0,0,0)",
+                    backgroundColor: "#ffffff"
+                  }}
+                  transition={noShowCount30Days > 0 ? {
+                    repeat: Infinity,
+                    duration: 2,
+                    ease: "easeInOut"
+                  } : undefined}
                 >
                   <div className="flex items-center justify-between w-full">
-                    <span className="text-[11px] font-bold text-red-600 uppercase tracking-widest">No-Shows</span>
-                    {metrics.no_show_count > 0 && (
+                    <span className="text-[11px] font-bold text-red-600 uppercase tracking-widest">No-Shows (30 Days)</span>
+                    {noShowCount30Days > 0 && (
                       <span className="relative flex h-2.5 w-2.5">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-600"></span>
                       </span>
                     )}
                   </div>
-                  <div className="flex items-end justify-between w-full mt-2">
-                    <span className="text-4xl font-extrabold text-red-600 tracking-tight">{metrics.no_show_count}</span>
+                  <div className="flex flex-col mt-2">
+                    <span className="text-4xl font-extrabold text-red-600 tracking-tight">{noShowCount30Days}</span>
+                    <span className="text-[10px] font-semibold text-slate-400 mt-1">Passengers in last 30d</span>
                   </div>
-                </div>
+                </motion.div>
                 <div onClick={() => {
                   if (role === 'FINANCE') {
                     setActiveTab('FINANCE_BULK_PO');
@@ -2283,6 +2502,98 @@ export default function Dashboard() {
               </div>
 
             </div>
+
+            {/* 30-Day Ticket Volume Trends Line Chart */}
+            <motion.div 
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.12 }}
+              className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mt-8"
+            >
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-indigo-500" />
+                    30-Day Ticket Volume Trends
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Daily breakdown of booked passenger records from {ticketVolumeTrends30Days.startDateLabel} to {ticketVolumeTrends30Days.endDateLabel}.
+                  </p>
+                </div>
+
+                {/* Micro-indicators */}
+                <div className="flex items-center gap-4 bg-slate-50 p-3 rounded-xl border border-slate-200/60 self-start md:self-auto">
+                  <div className="text-left">
+                    <span className="block text-[9px] font-black uppercase text-slate-400 tracking-wider">Total Booked (30d)</span>
+                    <span className="text-sm font-black text-slate-800">{ticketVolumeTrends30Days.totalVolume30d.toLocaleString()}</span>
+                  </div>
+                  <div className="h-6 w-px bg-slate-200"></div>
+                  <div className="text-left">
+                    <span className="block text-[9px] font-black uppercase text-slate-400 tracking-wider">Peak Daily Freq</span>
+                    <span className="text-sm font-black text-slate-800">{ticketVolumeTrends30Days.peakVolume30d} tickets</span>
+                  </div>
+                  <div className="h-6 w-px bg-slate-200"></div>
+                  <div className="text-left">
+                    <span className="block text-[9px] font-black uppercase text-slate-400 tracking-wider">Active Period</span>
+                    <span className="text-xs font-bold text-slate-650">30 Calendar Days</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="h-72">
+                {ticketVolumeTrends30Days.chartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={ticketVolumeTrends30Days.chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                      <XAxis 
+                        dataKey="formattedDate" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fill: '#64748B', fontSize: 10, fontWeight: 500 }} 
+                      />
+                      <YAxis 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fill: '#64748B', fontSize: 10 }}
+                        tickFormatter={(val) => `${val}`}
+                        allowDecimals={false}
+                      />
+                      <RechartsTooltip 
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <div className="bg-white border border-slate-200 p-3 rounded-lg shadow-md text-xs">
+                                <p className="font-extrabold text-slate-900 mb-1">{data.formattedDate}</p>
+                                <p className="text-slate-500 font-medium">Date: <strong className="text-slate-700">{data.date}</strong></p>
+                                <div className="mt-1.5 pt-1.5 border-t border-slate-100 flex justify-between gap-4">
+                                  <span className="text-slate-650">Tickets Booked:</span>
+                                  <strong className="text-indigo-600">{data.volume}</strong>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="volume" 
+                        stroke="#6366f1" 
+                        strokeWidth={2.5}
+                        dot={{ r: 3, stroke: '#6366f1', strokeWidth: 1.5, fill: '#fff' }}
+                        activeDot={{ r: 6, stroke: '#6366f1', strokeWidth: 2, fill: '#fff' }}
+                        name="Ticket Volume"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-slate-400 text-xs font-semibold">
+                    No trend data available for the last 30 days.
+                  </div>
+                )}
+              </div>
+            </motion.div>
 
             {/* Daily Pricing Intelligence & Trend Analysis */}
             <motion.div 
@@ -2568,9 +2879,9 @@ export default function Dashboard() {
                         onClick={() => setSelectedBudgetHealthFilter(healthStatus)}
                         className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
                           selectedBudgetHealthFilter === healthStatus
-                            ? healthStatus === 'CRITICAL' ? 'bg-red-100 text-red-750 border border-red-300'
-                              : healthStatus === 'WARNING' ? 'bg-amber-100 text-amber-705 border border-amber-300'
-                              : healthStatus === 'HEALTHY' ? 'bg-emerald-100 text-emerald-850 border border-emerald-350'
+                            ? healthStatus === 'CRITICAL' ? 'bg-red-100 text-red-700 border border-red-300'
+                              : healthStatus === 'WARNING' ? 'bg-amber-100 text-amber-700 border border-amber-300'
+                              : healthStatus === 'HEALTHY' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                               : 'bg-slate-900 text-white'
                             : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
                         }`}
@@ -2730,7 +3041,7 @@ export default function Dashboard() {
                           {/* Remaining balance box */}
                           <div className={`mt-4 p-2 rounded-lg text-center font-mono ${
                             remaining < 0 
-                              ? 'bg-rose-50 text-red-750 border border-rose-200' 
+                              ? 'bg-rose-50 text-red-700 border border-rose-200' 
                               : 'bg-slate-50 text-slate-700 border border-slate-100'
                           } border text-[10.5px]`}>
                             <span className="font-semibold uppercase text-[9px] tracking-wider block text-slate-400">
@@ -2879,63 +3190,117 @@ export default function Dashboard() {
         {/* Tickets Table */}
         {activeTab === 'ALL_TICKETS' && role !== 'FINANCE' && (
           <div className="space-y-4">
-            <div className="bg-white p-0.5 rounded-lg border border-slate-200 inline-flex shadow-2xs gap-0.5" role="group" aria-label="Ticket view filters">
+            <div className="bg-slate-100/75 border border-slate-200/80 p-1.5 rounded-xl flex flex-wrap gap-2 w-full shadow-xs" role="group" aria-label="Ticket view filters">
               <button
                 type="button"
                 aria-pressed={allTicketsSubTab === 'SUMMARY'}
                 onClick={() => setAllTicketsSubTab('SUMMARY')}
-                className={`px-3 py-1 text-xs font-semibold rounded transition-colors focus:outline-none focus:ring-1 focus:ring-sky-500 ${allTicketsSubTab === 'SUMMARY' ? 'bg-sky-50 text-sky-700' : 'text-slate-600 hover:text-slate-900'}`}
+                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-sky-500 border shadow-2xs ${
+                  allTicketsSubTab === 'SUMMARY' 
+                    ? 'bg-sky-600 text-white border-sky-600' 
+                    : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300'
+                }`}
               >
+                <FileText className={`w-3.5 h-3.5 ${allTicketsSubTab === 'SUMMARY' ? 'text-white' : 'text-slate-500'}`} />
                 Air ticket summary sheet
               </button>
+
               <button
                 type="button"
                 aria-pressed={allTicketsSubTab === 'NO_ISSUE'}
                 onClick={() => setAllTicketsSubTab('NO_ISSUE')}
-                className={`px-3 py-1 text-xs font-semibold rounded transition-colors focus:outline-none focus:ring-1 focus:ring-sky-500 ${allTicketsSubTab === 'NO_ISSUE' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:text-slate-900'}`}
+                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-emerald-500 border shadow-2xs ${
+                  allTicketsSubTab === 'NO_ISSUE' 
+                    ? 'bg-emerald-600 text-white border-emerald-600' 
+                    : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300'
+                }`}
               >
+                <Plane className={`w-3.5 h-3.5 ${allTicketsSubTab === 'NO_ISSUE' ? 'text-white' : 'text-emerald-600'}`} />
                 Ticket with no issue
               </button>
+
               <button
                 type="button"
                 aria-pressed={allTicketsSubTab === 'MISSED'}
                 onClick={() => setAllTicketsSubTab('MISSED')}
-                className={`px-3 py-1 text-xs font-semibold rounded transition-colors focus:outline-none focus:ring-1 focus:ring-sky-500 ${allTicketsSubTab === 'MISSED' ? 'bg-sky-50 text-sky-700' : 'text-slate-600 hover:text-slate-900'}`}
+                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-rose-500 border shadow-2xs ${
+                  allTicketsSubTab === 'MISSED' 
+                    ? 'bg-rose-600 text-white border-rose-600' 
+                    : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300'
+                }`}
               >
-                Passengers who missed their flight
+                <AlertCircle className={`w-3.5 h-3.5 ${allTicketsSubTab === 'MISSED' ? 'text-white' : 'text-rose-600'}`} />
+                {noShowCount30Days > 0 && (
+                  <span className={`inline-flex items-center justify-center text-[10px] font-black px-1.5 py-0.5 rounded-full ${allTicketsSubTab === 'MISSED' ? 'bg-white text-rose-600' : 'bg-rose-500 text-white'}`}>
+                    {noShowCount30Days}
+                  </span>
+                )}
+                Flight Missed list (No Show)
               </button>
+
               <button
                 type="button"
                 aria-pressed={allTicketsSubTab === 'UPDATE_REQUIRED'}
                 onClick={() => setAllTicketsSubTab('UPDATE_REQUIRED')}
-                className={`px-3 py-1 text-xs font-semibold rounded transition-colors flex items-center focus:outline-none focus:ring-1 focus:ring-red-500 ${allTicketsSubTab === 'UPDATE_REQUIRED' ? 'bg-red-50 text-red-700' : 'text-slate-600 hover:text-slate-900'}`}
+                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-orange-500 border shadow-2xs ${
+                  allTicketsSubTab === 'UPDATE_REQUIRED' 
+                    ? 'bg-orange-600 text-white border-orange-600' 
+                    : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300'
+                }`}
               >
-                {updateRequiredCount > 0 && <span className="mr-1.5 inline-flex items-center justify-center bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.25 rounded-full">{updateRequiredCount}</span>}
+                <AlertTriangle className={`w-3.5 h-3.5 ${allTicketsSubTab === 'UPDATE_REQUIRED' ? 'text-white' : 'text-orange-500'}`} />
+                {updateRequiredCount > 0 && (
+                  <span className={`inline-flex items-center justify-center text-[10px] font-black px-1.5 py-0.5 rounded-full ${allTicketsSubTab === 'UPDATE_REQUIRED' ? 'bg-white text-orange-600' : 'bg-orange-500 text-white'}`}>
+                    {updateRequiredCount}
+                  </span>
+                )}
                 Update Required
               </button>
+
               <button
                 type="button"
                 aria-pressed={allTicketsSubTab === 'INVOICE_PENDING'}
                 onClick={() => setAllTicketsSubTab('INVOICE_PENDING')}
-                className={`px-3 py-1 text-xs font-semibold rounded transition-colors flex items-center focus:outline-none focus:ring-1 focus:ring-amber-500 ${allTicketsSubTab === 'INVOICE_PENDING' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'text-slate-600 hover:text-slate-900'}`}
+                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-amber-500 border shadow-2xs ${
+                  allTicketsSubTab === 'INVOICE_PENDING' 
+                    ? 'bg-amber-600 text-white border-amber-600' 
+                    : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300'
+                }`}
               >
-                {invoicePendingCount > 0 && <span className="mr-1.5 inline-flex items-center justify-center bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.25 rounded-full">{invoicePendingCount}</span>}
+                <FileText className={`w-3.5 h-3.5 ${allTicketsSubTab === 'INVOICE_PENDING' ? 'text-white' : 'text-amber-500'}`} />
+                {invoicePendingCount > 0 && (
+                  <span className={`inline-flex items-center justify-center text-[10px] font-black px-1.5 py-0.5 rounded-full ${allTicketsSubTab === 'INVOICE_PENDING' ? 'bg-white text-amber-600' : 'bg-amber-500 text-white'}`}>
+                    {invoicePendingCount}
+                  </span>
+                )}
                 Invoice Pending
               </button>
+
               <button
                 type="button"
                 aria-pressed={allTicketsSubTab === 'DANGER_ZONE'}
                 onClick={() => setAllTicketsSubTab('DANGER_ZONE')}
-                className={`px-3 py-1 text-xs font-semibold rounded transition-colors flex items-center focus:outline-none focus:ring-1 focus:ring-orange-500 ${allTicketsSubTab === 'DANGER_ZONE' ? 'bg-orange-50 text-orange-700' : 'text-slate-600 hover:text-slate-900'}`}
+                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500 border shadow-2xs ${
+                  allTicketsSubTab === 'DANGER_ZONE' 
+                    ? 'bg-red-700 text-white border-red-700' 
+                    : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300'
+                }`}
               >
+                <AlertCircle className={`w-3.5 h-3.5 ${allTicketsSubTab === 'DANGER_ZONE' ? 'text-white' : 'text-red-600'}`} />
                 Danger Zone
               </button>
+
               <button
                 type="button"
                 aria-pressed={allTicketsSubTab === 'PAYMENT_DONE'}
                 onClick={() => setAllTicketsSubTab('PAYMENT_DONE')}
-                className={`px-3 py-1 text-xs font-semibold rounded transition-colors flex items-center focus:outline-none focus:ring-1 focus:ring-emerald-500 ${allTicketsSubTab === 'PAYMENT_DONE' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:text-slate-900'}`}
+                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-emerald-500 border shadow-2xs ${
+                  allTicketsSubTab === 'PAYMENT_DONE' 
+                    ? 'bg-emerald-700 text-white border-emerald-700' 
+                    : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300'
+                }`}
               >
+                <Award className={`w-3.5 h-3.5 ${allTicketsSubTab === 'PAYMENT_DONE' ? 'text-white' : 'text-emerald-600'}`} />
                 Payment Done List
               </button>
             </div>
@@ -3154,7 +3519,7 @@ export default function Dashboard() {
                   activeTab === 'ALL_TICKETS' && allTicketsSubTab === 'INVOICE_PENDING' && ['NO_SHOW', 'RESCHEDULED'].includes(t.flight_status) && (!t.other_invoice_number || !t.other_invoice_number.trim())
                     ? 'animate-pulse-glowing-amber border-amber-600'
                     : t.flight_status === 'NO_SHOW' || t.rescheduled_flight_status === 'NO_SHOW'
-                      ? 'bg-red-50/40 hover:bg-red-50 border-red-550'
+                      ? 'bg-red-50/40 hover:bg-red-50 border-red-500'
                       : 'bg-white hover:bg-slate-50 border-transparent'
                 }`} onClick={() => navigate(`/tickets/${t.id}`)}>
                   <div className="flex items-center justify-between mb-1.5">
