@@ -550,8 +550,46 @@ export default function Dashboard() {
   }, [tickets]);
 
   const pendingPaymentUpdateCount = useMemo(() => {
-    return tickets.filter(t => t.po_status !== 'payment done' && t.stage2_completed).length;
-  }, [tickets]);
+    const pendingInvoices = new Set<string>();
+    tickets.forEach(t => {
+      // 1) First Invoice
+      const hasFirstInvoice = (t.first_invoice_number && t.first_invoice_number.trim() !== '') || (t.invoice_number && t.invoice_number.trim() !== '');
+      if (hasFirstInvoice && t.stage2_completed) {
+        const invNum = (t.first_invoice_number || t.invoice_number || '').trim().toUpperCase();
+        const poStatus = t.po_status || 'pending po approval';
+        
+        let shouldCount = poStatus !== 'payment done';
+        if (role === 'ADMIN1') {
+          const hasPo = t.po_number && t.po_number.trim() !== '' && t.po_number.toLowerCase().trim() !== 'pending';
+          if (!hasPo) shouldCount = false;
+        }
+        
+        if (shouldCount) {
+          const groupKey = invNum ? `INV-${invNum}` : `PENDING_INVOICE`;
+          pendingInvoices.add(groupKey);
+        }
+      }
+
+      // 2) Rescheduled / Other Invoice
+      const hasOtherInvoice = t.other_invoice_number && t.other_invoice_number.trim() !== '';
+      if (hasOtherInvoice && t.stage2_completed) {
+        const invNum = t.other_invoice_number.trim().toUpperCase();
+        const poStatus = t.other_po_status || 'pending po approval';
+        
+        let shouldCount = poStatus !== 'payment done';
+        if (role === 'ADMIN1') {
+          const hasPo = t.other_po_number && t.other_po_number.trim() !== '' && t.other_po_number.toLowerCase().trim() !== 'pending';
+          if (!hasPo) shouldCount = false;
+        }
+        
+        if (shouldCount) {
+          const groupKey = invNum ? `INV-${invNum}` : `PENDING_INVOICE`;
+          pendingInvoices.add(groupKey);
+        }
+      }
+    });
+    return pendingInvoices.size;
+  }, [tickets, role]);
 
   const invoicePendingCount = useMemo(() => {
     return (tickets || []).filter(t => isInvoicePending(t)).length;
@@ -2269,10 +2307,14 @@ export default function Dashboard() {
                   aria-controls="panel-po-status-dashboard"
                   onClick={() => setActiveTab('PO_STATUS_DASHBOARD')}
                   className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors flex items-center focus:outline-none focus:ring-2 focus:ring-sky-500 rounded-t-sm ${activeTab === 'PO_STATUS_DASHBOARD' ? 'border-sky-500 text-sky-500' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-350'}`}
+                  title={`${displayCount} pending invoices`}
                 >
                   Payment Update
                   {displayCount > 0 && (
-                    <span className="ml-2 inline-flex items-center justify-center bg-amber-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[20px] h-5">
+                    <span 
+                      className="ml-2 inline-flex items-center justify-center bg-amber-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[20px] h-5"
+                      title={`${displayCount} pending invoices`}
+                    >
                       {displayCount}
                     </span>
                   )}
