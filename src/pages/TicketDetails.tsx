@@ -677,12 +677,12 @@ export default function TicketDetails() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label className="block text-xs font-medium text-slate-700 mb-1">Departure Date</label>
-                        <input name="departure_date" type="date" value={stage2Data.departure_date} onChange={handleStage2Change} onBlur={handleBlur} disabled={isLocked} className={`w-full px-2 py-1.5 text-sm border ${errors.departure_date ? 'border-red-500' : 'border-slate-300'} rounded focus:ring-1 focus:ring-sky-500 outline-none disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed`} required />
+                        <input name="departure_date" type="date" value={stage2Data.departure_date} onChange={handleStage2Change} onBlur={handleBlur} disabled={isLocked && role !== 'ADMIN' && role !== 'ADMIN1'} className={`w-full px-2 py-1.5 text-sm border ${errors.departure_date ? 'border-red-500' : 'border-slate-300'} rounded focus:ring-1 focus:ring-sky-500 outline-none disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed`} required />
                         <FieldError error={errors.departure_date} />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-slate-700 mb-1">Actual Arrival Date</label>
-                        <input name="arrival_date" type="date" value={stage2Data.arrival_date} onChange={handleStage2Change} onBlur={handleBlur} disabled={isLocked || ((!hasDeparturePassed || stage2Data.flight_status !== 'DEPARTED') && role !== 'ADMIN' && role !== 'ADMIN1')} className={`w-full px-2 py-1.5 text-sm border ${errors.arrival_date ? 'border-red-500' : 'border-slate-300'} rounded focus:ring-1 focus:ring-sky-500 outline-none disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed`} required={stage2Data.flight_status === 'DEPARTED'} />
+                        <input name="arrival_date" type="date" value={stage2Data.arrival_date} onChange={handleStage2Change} onBlur={handleBlur} disabled={(isLocked && role !== 'ADMIN' && role !== 'ADMIN1') || ((!hasDeparturePassed || stage2Data.flight_status !== 'DEPARTED') && role !== 'ADMIN' && role !== 'ADMIN1')} className={`w-full px-2 py-1.5 text-sm border ${errors.arrival_date ? 'border-red-500' : 'border-slate-300'} rounded focus:ring-1 focus:ring-sky-500 outline-none disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed`} required={stage2Data.flight_status === 'DEPARTED'} />
                         <FieldError error={errors.arrival_date} />
                       </div>
                       <div>
@@ -732,46 +732,46 @@ export default function TicketDetails() {
                         </h4>
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                          <div className="bg-white p-3 rounded border border-orange-200">
-                            <span className="block text-xs uppercase font-bold" style={{ color: '#c2410c' }}>Date of first scheduled flight</span>
-                            <span className="font-bold text-sm" style={{ color: '#000000' }}>{ticketData.departure_date || '-'}</span>
-                          </div>
-                          <div className="bg-white p-3 rounded border border-orange-200">
-                            <span className="block text-xs uppercase font-bold" style={{ color: '#c2410c' }}>Date (1st ticket) ISSUED</span>
-                            <span className="font-bold text-sm" style={{ color: '#000000' }}>{ticketData.ticket_arranged_date || '-'}</span>
-                          </div>
-                          <div className="bg-white p-3 rounded border border-orange-200">
-                            <span className="block text-xs uppercase font-bold" style={{ color: '#c2410c' }}>1st ticket amount</span>
-                            <span className="font-bold text-sm" style={{ color: '#000000' }}>{ticketData.approved_rate} {ticketData.currency}</span>
-                          </div>
-                          <div className="bg-white p-3 rounded border border-orange-200">
-                            <span className="block text-xs uppercase font-bold" style={{ color: '#c2410c' }}>1st ticket agent</span>
-                            <span className="font-bold text-sm" style={{ color: '#000000' }}>{ticketData.travel_agent || '-'}</span>
-                          </div>
+                           <div className="bg-white p-3 rounded border border-orange-200">
+                             <span className="block text-xs uppercase font-bold" style={{ color: '#c2410c' }}>Date of first scheduled flight</span>
+                             <span className="font-bold text-sm" style={{ color: '#000000' }}>{ticketData.departure_date || '-'}</span>
+                           </div>
+                           <div className="bg-white p-3 rounded border border-orange-200">
+                             <span className="block text-xs uppercase font-bold" style={{ color: '#c2410c' }}>Date (1st ticket) ISSUED</span>
+                             <span className="font-bold text-sm" style={{ color: '#000000' }}>{ticketData.ticket_arranged_date || '-'}</span>
+                           </div>
+                           <div className="bg-white p-3 rounded border border-orange-200">
+                             <span className="block text-xs uppercase font-bold" style={{ color: '#c2410c' }}>1st ticket amount</span>
+                             <span className="font-bold text-sm" style={{ color: '#000000' }}>{ticketData.approved_rate} {ticketData.currency}</span>
+                           </div>
+                           <div className="bg-white p-3 rounded border border-orange-200">
+                             <span className="block text-xs uppercase font-bold" style={{ color: '#c2410c' }}>1st ticket agent</span>
+                             <span className="font-bold text-sm" style={{ color: '#000000' }}>{ticketData.travel_agent || '-'}</span>
+                           </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                           <div>
                             <label className="block text-xs font-bold uppercase tracking-wider mb-1" style={{ color: '#c2410c' }}>2nd Ticket Dep. Date *</label>
-                            <input name="rescheduled_departure_date" required type="date" value={stage2Data.rescheduled_departure_date} onChange={handleStage2Change} onBlur={handleBlur} disabled={isLocked} className={`w-full px-2 py-1.5 text-sm border ${errors.rescheduled_departure_date ? 'border-red-500' : 'border-orange-300'} rounded focus:ring-1 focus:ring-orange-500 outline-none font-semibold disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed`} style={{ color: '#000000', backgroundColor: isLocked ? '#f1f5f9' : '#ffffff' }} />
+                            <input name="rescheduled_departure_date" required type="date" value={stage2Data.rescheduled_departure_date} onChange={handleStage2Change} onBlur={handleBlur} disabled={isLocked && role !== 'ADMIN' && role !== 'ADMIN1'} className={`w-full px-2 py-1.5 text-sm border ${errors.rescheduled_departure_date ? 'border-red-500' : 'border-orange-300'} rounded focus:ring-1 focus:ring-orange-500 outline-none font-semibold disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed`} style={{ color: '#000000', backgroundColor: isLocked && role !== 'ADMIN' && role !== 'ADMIN1' ? '#f1f5f9' : '#ffffff' }} />
                             <FieldError error={errors.rescheduled_departure_date} />
                           </div>
                           <div>
                             <label className="block text-xs font-bold uppercase tracking-wider mb-1" style={{ color: '#c2410c' }}>2nd Ticket Issued *</label>
-                            <input name="rescheduled_ticket_date" required type="date" value={stage2Data.rescheduled_ticket_date} onChange={handleStage2Change} onBlur={handleBlur} disabled={isLocked} className={`w-full px-2 py-1.5 text-sm border ${errors.rescheduled_ticket_date ? 'border-red-500' : 'border-orange-300'} rounded focus:ring-1 focus:ring-orange-500 outline-none font-semibold disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed`} style={{ color: '#000000', backgroundColor: isLocked ? '#f1f5f9' : '#ffffff' }} />
+                            <input name="rescheduled_ticket_date" required type="date" value={stage2Data.rescheduled_ticket_date} onChange={handleStage2Change} onBlur={handleBlur} disabled={isLocked && role !== 'ADMIN' && role !== 'ADMIN1'} className={`w-full px-2 py-1.5 text-sm border ${errors.rescheduled_ticket_date ? 'border-red-500' : 'border-orange-300'} rounded focus:ring-1 focus:ring-orange-500 outline-none font-semibold disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed`} style={{ color: '#000000', backgroundColor: isLocked && role !== 'ADMIN' && role !== 'ADMIN1' ? '#f1f5f9' : '#ffffff' }} />
                             <FieldError error={errors.rescheduled_ticket_date} />
                           </div>
                           <div>
                             <label className="block text-xs font-bold uppercase tracking-wider mb-1" style={{ color: '#c2410c' }}>2nd Ticket Amount</label>
-                            <input name="rescheduled_ticket_amount" type="number" step="0.01" value={stage2Data.rescheduled_ticket_amount} onChange={handleStage2Change} onBlur={handleBlur} disabled={isLocked} className={`w-full px-2 py-1.5 text-sm border ${errors.rescheduled_ticket_amount ? 'border-red-500' : 'border-orange-300'} rounded focus:ring-1 focus:ring-orange-500 outline-none font-semibold disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed`} style={{ color: '#000000', backgroundColor: isLocked ? '#f1f5f9' : '#ffffff' }} />
+                            <input name="rescheduled_ticket_amount" type="number" step="0.01" value={stage2Data.rescheduled_ticket_amount} onChange={handleStage2Change} onBlur={handleBlur} disabled={isLocked && role !== 'ADMIN' && role !== 'ADMIN1'} className={`w-full px-2 py-1.5 text-sm border ${errors.rescheduled_ticket_amount ? 'border-red-500' : 'border-orange-300'} rounded focus:ring-1 focus:ring-orange-500 outline-none font-semibold disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed`} style={{ color: '#000000', backgroundColor: isLocked && role !== 'ADMIN' && role !== 'ADMIN1' ? '#f1f5f9' : '#ffffff' }} />
                             <FieldError error={errors.rescheduled_ticket_amount} />
                           </div>
                           <div>
                             <label className="block text-xs font-bold uppercase tracking-wider mb-1" style={{ color: '#c2410c' }}>2nd Ticket Agent</label>
                             {isAddingNewAgent ? (
                               <div className="flex gap-2">
-                                <input autoFocus type="text" value={newAgentName} onChange={e => setNewAgentName(e.target.value)} disabled={isLocked} className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:ring-1 focus:ring-sky-500 outline-none text-black bg-white font-semibold disabled:bg-slate-100 disabled:text-slate-500" style={{ color: '#000000', backgroundColor: isLocked ? '#f1f5f9' : '#ffffff' }} placeholder="New agent..." />
-                                <button type="button" disabled={isLocked} onClick={async () => {
+                                <input autoFocus type="text" value={newAgentName} onChange={e => setNewAgentName(e.target.value)} disabled={isLocked && role !== 'ADMIN' && role !== 'ADMIN1'} className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:ring-1 focus:ring-sky-500 outline-none text-black bg-white font-semibold disabled:bg-slate-100 disabled:text-slate-500" style={{ color: '#000000', backgroundColor: isLocked && role !== 'ADMIN' && role !== 'ADMIN1' ? '#f1f5f9' : '#ffffff' }} placeholder="New agent..." />
+                                <button type="button" disabled={isLocked && role !== 'ADMIN' && role !== 'ADMIN1'} onClick={async () => {
                                   if (!newAgentName.trim()) return;
                                   try {
                                     const res = await api.post('/options', { category: 'TRAVEL_AGENT', value: newAgentName.trim() });
@@ -788,10 +788,10 @@ export default function TicketDetails() {
                               </div>
                             ) : (
                               <>
-                              <select name="rescheduled_ticket_agent" value={stage2Data.rescheduled_ticket_agent} onBlur={handleBlur} disabled={isLocked} onChange={(e) => {
+                              <select name="rescheduled_ticket_agent" value={stage2Data.rescheduled_ticket_agent} onBlur={handleBlur} disabled={isLocked && role !== 'ADMIN' && role !== 'ADMIN1'} onChange={(e) => {
                                 if (e.target.value === 'ADD_NEW') setIsAddingNewAgent(true);
                                 else handleStage2Change(e);
-                              }} className={`w-full px-2 py-1.5 text-sm border ${errors.rescheduled_ticket_agent ? 'border-red-500' : 'border-orange-300'} rounded focus:ring-1 focus:ring-orange-500 outline-none font-semibold disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed`} style={{ color: '#000000', backgroundColor: isLocked ? '#f1f5f9' : '#ffffff' }}>
+                              }} className={`w-full px-2 py-1.5 text-sm border ${errors.rescheduled_ticket_agent ? 'border-red-500' : 'border-orange-300'} rounded focus:ring-1 focus:ring-orange-500 outline-none font-semibold disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed`} style={{ color: '#000000', backgroundColor: isLocked && role !== 'ADMIN' && role !== 'ADMIN1' ? '#f1f5f9' : '#ffffff' }}>
                                 <option value="" style={{ color: '#000000' }}>Select...</option>
                                 {getFilteredOptions('TRAVEL_AGENT').map(o => (
                                   <option key={o.id} value={o.value} style={{ color: '#000000' }}>{o.value}</option>
@@ -806,7 +806,7 @@ export default function TicketDetails() {
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4 border-t border-orange-100 pt-3">
                           <div>
                             <label className="block text-xs font-bold uppercase tracking-wider mb-1" style={{ color: '#c2410c' }}>2nd Ticket Actual Arrival Date</label>
-                            <input name="rescheduled_arrival_date" type="date" value={stage2Data.rescheduled_arrival_date || ''} onChange={handleStage2Change} onBlur={handleBlur} disabled={isLocked || ((!hasRescheduledDeparturePassed || stage2Data.rescheduled_flight_status !== 'DEPARTED') && role !== 'ADMIN' && role !== 'ADMIN1')} required={stage2Data.rescheduled_flight_status === 'DEPARTED'} className={`w-full px-2 py-1.5 text-sm border ${errors.rescheduled_arrival_date ? 'border-red-500' : 'border-orange-300'} rounded focus:ring-1 focus:ring-orange-500 outline-none font-semibold disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed`} style={{ color: '#000000', backgroundColor: (isLocked || (!hasRescheduledDeparturePassed || stage2Data.rescheduled_flight_status !== 'DEPARTED') && role !== 'ADMIN' && role !== 'ADMIN1') ? '#e2e8f0' : '#ffffff' }} />
+                            <input name="rescheduled_arrival_date" type="date" value={stage2Data.rescheduled_arrival_date || ''} onChange={handleStage2Change} onBlur={handleBlur} disabled={(isLocked && role !== 'ADMIN' && role !== 'ADMIN1') || ((!hasRescheduledDeparturePassed || stage2Data.rescheduled_flight_status !== 'DEPARTED') && role !== 'ADMIN' && role !== 'ADMIN1')} required={stage2Data.rescheduled_flight_status === 'DEPARTED'} className={`w-full px-2 py-1.5 text-sm border ${errors.rescheduled_arrival_date ? 'border-red-500' : 'border-orange-300'} rounded focus:ring-1 focus:ring-orange-500 outline-none font-semibold disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed`} style={{ color: '#000000', backgroundColor: ((isLocked && role !== 'ADMIN' && role !== 'ADMIN1') || (!hasRescheduledDeparturePassed || stage2Data.rescheduled_flight_status !== 'DEPARTED') && role !== 'ADMIN' && role !== 'ADMIN1') ? '#e2e8f0' : '#ffffff' }} />
                             <FieldError error={errors.rescheduled_arrival_date} />
                           </div>
                           <div>
@@ -911,8 +911,8 @@ export default function TicketDetails() {
                               <div className="w-full">
                                 <input
                                   type="url"
-                                  disabled={isLocked}
-                                  placeholder={isLocked ? "Locked (PO Assigned)" : "Enter Share Point Link..."}
+                                  disabled={isLocked && role !== 'ADMIN' && role !== 'ADMIN1'}
+                                  placeholder={isLocked && role !== 'ADMIN' && role !== 'ADMIN1' ? "Locked (PO Assigned)" : "Enter Share Point Link..."}
                                   className="w-full text-xs p-2 border border-orange-300 rounded focus:border-orange-500 outline-none font-medium text-black bg-white disabled:bg-slate-100 disabled:text-slate-400"
                                   onBlur={(e) => {
                                     if (e.target.value) {
@@ -928,14 +928,21 @@ export default function TicketDetails() {
                       </div>
                     )}
                     <div className="flex justify-end mt-3 items-center gap-2">
-                      {isLocked ? (
+                      {isLocked && role !== 'ADMIN' && role !== 'ADMIN1' ? (
                         <span className="text-xs text-amber-600 font-semibold bg-amber-50 px-2.5 py-1.5 rounded border border-amber-200 inline-flex items-center gap-1">
                           🔒 Stage 2 Locked (PO Assigned)
                         </span>
                       ) : (
-                        <button type="submit" disabled={savingStage2} className="inline-flex items-center px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-medium rounded disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-1">
-                          <Save className="h-3 w-3 mr-1" aria-hidden="true" /> {savingStage2 ? 'Saving...' : 'Update Details'}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          {isLocked && (
+                            <span className="text-xs text-amber-600 font-semibold bg-amber-50 px-2.5 py-1 rounded border border-amber-200 inline-flex items-center gap-1">
+                              🔒 PO Assigned (Admin Mode)
+                            </span>
+                          )}
+                          <button id="btn-save-stage2" type="submit" disabled={savingStage2} className="inline-flex items-center px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-medium rounded disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-1">
+                            <Save className="h-3 w-3 mr-1" aria-hidden="true" /> {savingStage2 ? 'Saving...' : 'Update Details'}
+                          </button>
+                        </div>
                       )}
                     </div>
                   </form>
