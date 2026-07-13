@@ -143,7 +143,9 @@ export default function Settings() {
         ...gdriveConfig,
         accessToken: token,
         linkedEmail: email,
-        enabled: true
+        enabled: true,
+        accessTokenExpired: false,
+        lastError: ""
       };
       setGdriveConfig(updatedConfig);
       
@@ -2227,6 +2229,17 @@ export default function Settings() {
                     </div>
                   ) : (
                     <form onSubmit={handleSaveGdriveConfig} className="space-y-6">
+                      {gdriveConfig.accessTokenExpired && (
+                        <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs space-y-1.5 animate-fade-in col-span-1 md:col-span-2">
+                          <p className="font-bold flex items-center gap-1.5 text-rose-950">
+                            <span className="inline-block w-2.5 h-2.5 rounded-full bg-rose-600 animate-pulse" />
+                            Google Drive Session Expired / Invalidated
+                          </p>
+                          <p className="text-rose-900 leading-relaxed">
+                            {gdriveConfig.lastError || "Your Google Drive access token has expired or been invalidated (typical for Google APIs when using standard OAuth logins). The automatic exporter has been temporarily disabled. Please click \"Link Google Drive Account\" below to re-authenticate and re-enable automated backups."}
+                          </p>
+                        </div>
+                      )}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Active State */}
                         <div className="col-span-1 md:col-span-2 bg-slate-50 border border-slate-200 p-4 rounded-xl flex items-center justify-between">

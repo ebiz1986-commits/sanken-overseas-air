@@ -2162,7 +2162,7 @@ export default function Dashboard() {
                                 </p>
                               </div>
                               <span className="shrink-0 text-[9px] font-black text-sky-700 bg-sky-50 border border-sky-100 px-1 py-0.5 rounded-md font-mono">
-                                {amt.count} {amt.count === 1 ? 'Inv' : 'Invs'}
+                                {amt.count} {amt.count === 1 ? 'Tkt' : 'Tkts'}
                               </span>
                             </div>
                           );

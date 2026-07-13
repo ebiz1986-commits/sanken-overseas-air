@@ -3057,6 +3057,30 @@ async function performGoogleDriveSync(config: any, triggerType: "auto" | "manual
     const errorMsg = error?.response?.data?.error?.message || error?.message || String(error);
     console.error("Google Drive sync failed:", errorMsg);
 
+    // Check if this is an authentication/authorization error (401, invalid credentials, etc.)
+    const isAuthError = (error?.response?.status === 401) || 
+                        (typeof errorMsg === 'string' && (
+                          errorMsg.toLowerCase().includes("invalid authentication credentials") || 
+                          errorMsg.toLowerCase().includes("invalid credentials") ||
+                          errorMsg.toLowerCase().includes("unauthorized") ||
+                          errorMsg.toLowerCase().includes("expired")
+                        ));
+
+    if (isAuthError) {
+      try {
+        await fdb.collection('gdrive').doc('config').update({
+          enabled: false,
+          accessToken: "", // Clear invalid token
+          linkedEmail: "", // Clear linked email
+          accessTokenExpired: true,
+          lastError: "Google Drive account was unlinked because the access token expired or became invalid. Please reconnect your account."
+        });
+        console.log("[Google Drive Sync] Automatically unlinked Google Drive due to invalid or expired credentials.");
+      } catch (dbErr) {
+        console.error("Failed to automatically disable Google Drive config on auth error:", dbErr);
+      }
+    }
+
     // Log failure
     const logId = crypto.randomUUID();
     const logData = {
@@ -3212,6 +3236,30 @@ async function performGoogleDriveDbBackup(config: any, triggerType: "auto" | "ma
   } catch (error: any) {
     const errorMsg = error?.response?.data?.error?.message || error?.message || String(error);
     console.error("Google Drive database backup failed:", errorMsg);
+
+    // Check if this is an authentication/authorization error (401, invalid credentials, etc.)
+    const isAuthError = (error?.response?.status === 401) || 
+                        (typeof errorMsg === 'string' && (
+                          errorMsg.toLowerCase().includes("invalid authentication credentials") || 
+                          errorMsg.toLowerCase().includes("invalid credentials") ||
+                          errorMsg.toLowerCase().includes("unauthorized") ||
+                          errorMsg.toLowerCase().includes("expired")
+                        ));
+
+    if (isAuthError) {
+      try {
+        await fdb.collection('gdrive').doc('config').update({
+          enabled: false,
+          accessToken: "", // Clear invalid token
+          linkedEmail: "", // Clear linked email
+          accessTokenExpired: true,
+          lastError: "Google Drive account was unlinked because the access token expired or became invalid. Please reconnect your account."
+        });
+        console.log("[Google Drive Backup] Automatically unlinked Google Drive due to invalid or expired credentials.");
+      } catch (dbErr) {
+        console.error("Failed to automatically disable Google Drive config on auth error:", dbErr);
+      }
+    }
 
     // Log failure
     const logId = crypto.randomUUID();
