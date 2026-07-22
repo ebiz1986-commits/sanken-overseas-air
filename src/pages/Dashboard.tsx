@@ -1122,6 +1122,20 @@ export default function Dashboard() {
   ) => {
     const todayStr = new Date().toISOString().split('T')[0];
     
+    // Auto-extract Admin-entered invoice date from ticket records in this invoice group
+    let adminInvoiceDate = '';
+    if (tickets && tickets.length > 0) {
+      for (const t of tickets) {
+        const candidate = t.invoice_type === 'other'
+          ? (t.other_invoice_date || t.rescheduled_ticket_date || t.invoice_date || t.first_invoice_date)
+          : (t.invoice_date || t.first_invoice_date || t.other_invoice_date || t.rescheduled_ticket_date);
+        if (candidate) {
+          adminInvoiceDate = candidate;
+          break;
+        }
+      }
+    }
+
     setErpBulkModalData({
       invoice_number: invoiceNumber,
       tickets,
@@ -1131,7 +1145,7 @@ export default function Dashboard() {
     });
     
     setErpPoDate(todayStr); // Take same date assigning the PO automatically
-    setErpInvoiceDate(todayStr); // Also initialize invoice date to today
+    setErpInvoiceDate(adminInvoiceDate || todayStr); // Initialize invoice date from Admin ticket entry
     setErpProjectPos(project_pos || {});
     
     const amountsMap: Record<string, string> = {};
@@ -5934,8 +5948,10 @@ export default function Dashboard() {
                       type="date"
                       value={erpInvoiceDate}
                       onChange={(e) => setErpInvoiceDate(e.target.value)}
-                      className="w-full text-sm p-2.5 border border-slate-300 rounded-xl focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none hover:border-slate-400 transition-colors font-medium text-slate-900 bg-white"
+                      className="w-full text-sm p-2.5 border border-slate-300 rounded-xl focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none transition-colors font-medium text-slate-900 bg-slate-100/80 cursor-not-allowed"
+                      disabled
                     />
+                    <p className="text-[10px] text-slate-400 mt-1 font-medium">Auto-populated from Admin ticket entry.</p>
                   </div>
                 </div>
 
