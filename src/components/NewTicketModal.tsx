@@ -523,7 +523,7 @@ export default function NewTicketModal({ isOpen = true, onClose, projects, ticke
                       {bulkPassengers.map((row, index) => {
                         const isFocused = focusedRowIndex === index;
                         return (
-                          <tr key={row.id} className={`transition-all ${isFocused ? 'bg-sky-50/70 border-l-2 border-sky-500' : 'hover:bg-slate-50/50'}`}>
+                          <tr key={row.id || `bulk-row-${index}`} className={`transition-all ${isFocused ? 'bg-sky-50/70 border-l-2 border-sky-500' : 'hover:bg-slate-50/50'}`}>
                             <td className="py-2 px-3 text-center text-xs font-mono font-bold text-slate-400">
                               {index + 1}
                             </td>
@@ -1050,7 +1050,7 @@ export default function NewTicketModal({ isOpen = true, onClose, projects, ticke
                 {Array.isArray(formData.attached_images) && formData.attached_images.length > 0 && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                     {formData.attached_images.map((img: string, idx: number) => (
-                      <div key={idx} className="flex items-center space-x-3 bg-white p-2 border border-slate-200 rounded-lg shadow-sm">
+                      <div key={`att-${idx}-${img.slice(-15)}`} className="flex items-center space-x-3 bg-white p-2 border border-slate-200 rounded-lg shadow-sm">
                         <div className="relative group w-12 h-12 rounded-lg border border-slate-200 overflow-hidden shadow-sm bg-slate-50 flex items-center justify-center flex-shrink-0">
                           {isPdfUrl(img) ? (
                             <div className="w-full h-full bg-red-500/10 flex flex-col items-center justify-center p-0.5">

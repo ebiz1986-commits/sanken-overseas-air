@@ -771,8 +771,8 @@ export default function PoStatusDashboard({ tickets, allProjects, fetchData, rol
                                         className="flex-1 p-2 border border-slate-200 rounded-lg text-xs bg-white text-slate-800 focus:ring-2 focus:ring-sky-500"
                                       >
                                         <option value="">Select Travel Agent</option>
-                                        {getFilteredOptions('TRAVEL_AGENT').map((opt) => (
-                                          <option key={opt.id} value={opt.value}>
+                                        {getFilteredOptions('TRAVEL_AGENT').map((opt: any, idx: number) => (
+                                          <option key={opt.id || `agent-opt-${opt.value}-${idx}`} value={opt.value}>
                                             {opt.value}
                                           </option>
                                         ))}

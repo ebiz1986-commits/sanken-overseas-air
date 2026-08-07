@@ -2118,7 +2118,7 @@ export default function Dashboard() {
                       <span className="text-[11px] font-extrabold text-slate-800 uppercase tracking-wider block">Invoices Pending</span>
                     </div>
                     <span className="text-[10px] font-bold text-sky-700 bg-sky-50 border border-sky-100 px-1.5 py-0.5 rounded-full leading-none">
-                      {financialSummary.invoicePendingCount} Items
+                      {financialSummary.invoicePendingCount} {financialSummary.invoicePendingCount === 1 ? 'Ticket' : 'Tickets'}
                     </span>
                   </div>
                   
@@ -2143,7 +2143,7 @@ export default function Dashboard() {
                   </div>
 
                   {/* List of Agents with Counts */}
-                  <div className="space-y-1 max-h-[110px] overflow-y-auto pr-1 scrollbar-thin">
+                  <div className="space-y-1.5 max-h-[280px] overflow-y-auto pr-1 scrollbar-thin">
                     {(Object.entries(financialSummary.invoicePendingByAgent) as [string, { USD: number; LKR: number; count: number }][]).filter(([_, val]) => val.count > 0).length === 0 ? (
                       <div className="text-center text-[10px] text-slate-400 py-3 italic">
                         No pending invoices.
@@ -2183,7 +2183,7 @@ export default function Dashboard() {
                       <span className="text-[11px] font-extrabold text-slate-800 uppercase tracking-wider block">POs Pending</span>
                     </div>
                     <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded-full leading-none">
-                      {financialSummary.poPendingCount} Items
+                      {financialSummary.poPendingCount} {financialSummary.poPendingCount === 1 ? 'Ticket' : 'Tickets'}
                     </span>
                   </div>
                   
@@ -2208,10 +2208,10 @@ export default function Dashboard() {
                   </div>
 
                   {/* List of Agents with Counts */}
-                  <div className="space-y-1 max-h-[110px] overflow-y-auto pr-1 scrollbar-thin">
+                  <div className="space-y-1.5 max-h-[280px] overflow-y-auto pr-1 scrollbar-thin">
                     {(Object.entries(financialSummary.poPendingByAgent) as [string, { USD: number; LKR: number; count: number }][]).filter(([_, val]) => val.count > 0).length === 0 ? (
                       <div className="text-center text-[10px] text-slate-400 py-3 italic">
-                        No pending POs.
+                        No pending PO tickets.
                       </div>
                     ) : (
                       (Object.entries(financialSummary.poPendingByAgent) as [string, { USD: number; LKR: number; count: number }][])
@@ -2229,7 +2229,7 @@ export default function Dashboard() {
                                 </p>
                               </div>
                               <span className="shrink-0 text-[9px] font-black text-amber-700 bg-amber-50 border border-amber-100 px-1 py-0.5 rounded-md font-mono">
-                                {amt.count} {amt.count === 1 ? 'PO' : 'POs'}
+                                {amt.count} {amt.count === 1 ? 'Tkt' : 'Tkts'}
                               </span>
                             </div>
                           );
@@ -2999,7 +2999,7 @@ export default function Dashboard() {
 
                 return (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredProjects.map((proj) => {
+                    {filteredProjects.map((proj, idx) => {
                       const totalCommitted = (proj.spent || 0) + (proj.pending || 0);
                       const utilRate = proj.budget > 0 ? Math.round((totalCommitted / proj.budget) * 100) : 0;
                       const remaining = (proj.budget || 0) - totalCommitted;
@@ -3032,7 +3032,7 @@ export default function Dashboard() {
 
                       return (
                         <div
-                          key={proj.id}
+                          key={proj.id || `proj-card-${idx}`}
                           className={`bg-gradient-to-b ${bgGradient} bg-white rounded-xl border ${cardBorder} p-5 flex flex-col justify-between transition-all duration-200 hover:shadow-xs relative overflow-hidden`}
                         >
                           <div>
@@ -3639,7 +3639,7 @@ export default function Dashboard() {
                       <div className="flex items-center space-x-2 overflow-x-auto py-1 scrollbar-hidden">
                         {docs.map((doc, idx) => (
                           <div 
-                            key={idx}
+                            key={`doc-mob-${doc.type}-${doc.url || idx}-${idx}`}
                             onClick={(e) => { e.stopPropagation(); setLightboxImage(doc.url); }}
                             className="relative flex-none w-12 h-12 bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm hover:scale-105 active:scale-95 transition-all cursor-pointer flex items-center justify-center p-0.5"
                             title={doc.label}
@@ -3787,7 +3787,7 @@ export default function Dashboard() {
                             <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-hidden">
                               {docs.map((doc, idx) => (
                                 <div 
-                                  key={idx}
+                                  key={`doc-dt-${doc.type}-${doc.url || idx}-${idx}`}
                                   onClick={(e) => { e.stopPropagation(); setLightboxImage(doc.url); }}
                                   className="relative flex-none w-12 h-12 bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm hover:scale-105 active:scale-95 transition-all cursor-pointer flex items-center justify-center p-0.5 hover:border-sky-500"
                                   title={doc.label}
@@ -4050,7 +4050,7 @@ export default function Dashboard() {
                                   <div className="flex -space-x-1 overflow-hidden">
                                     {getTicketDocuments(t).map((doc, idx) => (
                                       <div 
-                                        key={idx} 
+                                        key={`doc-tbl-${doc.type}-${doc.url || idx}-${idx}`} 
                                         className="relative group w-6.5 h-6.5 rounded-md border border-slate-200 overflow-hidden shadow-sm hover:z-10 hover:scale-110 cursor-pointer transition-transform bg-slate-50 flex items-center justify-center animate-fade-in" 
                                         onClick={(e) => { e.stopPropagation(); setLightboxImage(doc.url); }}
                                         title={doc.label}
@@ -5562,7 +5562,7 @@ export default function Dashboard() {
                                          <div className="flex flex-wrap gap-2 mt-2">
                                            {linkedInvoices.map((link, idx) => (
                                              <button
-                                               key={idx}
+                                               key={`linked-btn-${link.invoiceNumber}-${idx}`}
                                                type="button"
                                                onClick={() => {
                                                  const targetGroupKey = Object.keys(invoiceGroups).find(
@@ -5947,10 +5947,10 @@ export default function Dashboard() {
                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-3">
                   <span className="text-[11px] font-black text-slate-500 uppercase tracking-wider block">Project / Re; company PO References:</span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {erpBulkModalData.activeAllocationUnits.map((unit) => {
+                    {erpBulkModalData.activeAllocationUnits.map((unit, unitIdx) => {
                       const currentVal = erpProjectPos[unit.id] || '';
                       return (
-                        <div key={unit.id} className="flex flex-col gap-1 bg-white p-3 rounded-xl border border-slate-200/60 shadow-xs">
+                        <div key={unit.id || `alloc-unit-${unitIdx}`} className="flex flex-col gap-1 bg-white p-3 rounded-xl border border-slate-200/60 shadow-xs">
                           <div className="flex items-center justify-between gap-1 mb-1">
                             <span className="text-[11px] font-black text-slate-700 truncate" title={unit.name}>{unit.name}</span>
                             <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${
@@ -6036,10 +6036,10 @@ export default function Dashboard() {
 
                   {/* Tickets grid */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-1">
-                    {erpBulkModalData.tickets.map((t: any) => {
+                    {erpBulkModalData.tickets.map((t: any, idx: number) => {
                       const ticketAmount = erpInvoiceAmounts[t.id] || '';
                       return (
-                        <div key={t.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between gap-2.5">
+                        <div key={t.id || `erp-ticket-${idx}`} className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between gap-2.5">
                           <div className="truncate flex-1">
                             <span className="block text-xs font-extrabold text-slate-800 truncate" title={t.passenger_name}>
                               {t.passenger_name || 'Generic Passenger'}
@@ -6137,8 +6137,8 @@ export default function Dashboard() {
                             className="flex-1 text-sm p-2.5 border border-slate-300 rounded-xl focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none hover:border-slate-400 transition-colors font-semibold text-slate-800 bg-white"
                           >
                             <option value="">Select Travel Agent</option>
-                            {getFilteredOptions('TRAVEL_AGENT').map((opt: any) => (
-                              <option key={opt.id} value={opt.value}>
+                            {getFilteredOptions('TRAVEL_AGENT').map((opt: any, idx: number) => (
+                              <option key={opt.id || `erp-agent-${opt.value}-${idx}`} value={opt.value}>
                                 {opt.value}
                               </option>
                             ))}
