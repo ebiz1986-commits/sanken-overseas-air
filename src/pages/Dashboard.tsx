@@ -652,7 +652,8 @@ export default function Dashboard() {
       t.flight_status === 'NO_SHOW' || 
       t.rescheduled_flight_status === 'NO_SHOW' || 
       t.flight_status === 'CANCELLED' || 
-      t.rescheduled_flight_status === 'CANCELLED'
+      t.rescheduled_flight_status === 'CANCELLED' ||
+      (['RESCHEDULED', 'CANCELLED'].includes(t.flight_status) && t.rescheduled_flight_status === 'DEPARTED')
     ).length;
 
     const now = new Date();
@@ -708,6 +709,7 @@ export default function Dashboard() {
   }, [tickets]);
 
   const noShowCount30Days = dashboardTopSummary?.noShowCount30Days || 0;
+  const totalNoShowCount = dashboardTopSummary?.noShowCount || 0;
 
   const financialSummary = useMemo(() => {
     let invoicePendingUSD = 0;
@@ -1651,30 +1653,13 @@ export default function Dashboard() {
       if (allTicketsSubTab === 'NO_ISSUE') {
         matchesSubTab = t.flight_status === 'DEPARTED' && !isInvoicePending(t);
       } else if (allTicketsSubTab === 'MISSED') {
-        // Appears here after the first NO_SHOW, and also after second NO_SHOW, and also if cancelled (within last 30 days)
+        // Appears here for all NO_SHOW, CANCELLED, or missed flight candidate tickets
         const isMissed = (t.flight_status === 'NO_SHOW' || 
                         t.rescheduled_flight_status === 'NO_SHOW' ||
                         t.flight_status === 'CANCELLED' || 
                         t.rescheduled_flight_status === 'CANCELLED' ||
-                        (['RESCHEDULED', 'CANCELLED'].includes(t.flight_status) && t.rescheduled_flight_status === 'DEPARTED')) && !isInvoicePending(t);
-        if (!isMissed) {
-          matchesSubTab = false;
-        } else {
-          const now = new Date();
-          const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-          thirtyDaysAgo.setHours(0, 0, 0, 0);
-          const dateVal = t.departure_date || t.rescheduled_departure_date || t.created_at;
-          if (!dateVal) {
-            matchesSubTab = false;
-          } else {
-            try {
-              const d = new Date(dateVal);
-              matchesSubTab = !isNaN(d.getTime()) && d >= thirtyDaysAgo && d <= now;
-            } catch {
-              matchesSubTab = false;
-            }
-          }
-        }
+                        (['RESCHEDULED', 'CANCELLED'].includes(t.flight_status) && t.rescheduled_flight_status === 'DEPARTED'));
+        matchesSubTab = isMissed;
       } else if (allTicketsSubTab === 'UPDATE_REQUIRED') {
         if (role === 'FINANCE') {
           matchesSubTab = t.stage2_completed && !t.stage3_completed && t.flight_status !== 'PENDING';
@@ -2096,7 +2081,7 @@ export default function Dashboard() {
 
               {/* No Shows */}
               <motion.div 
-                animate={noShowCount30Days > 0 ? {
+                animate={totalNoShowCount > 0 ? {
                   borderColor: ["#fecaca", "#ef4444", "#fecaca"],
                   boxShadow: ["0px 0px 0px rgba(239, 68, 68, 0)", "0px 0px 6px rgba(239, 68, 68, 0.3)", "0px 0px 0px rgba(239, 68, 68, 0)"],
                   backgroundColor: ["#ffffff", "#fff5f5", "#ffffff"]
@@ -2105,17 +2090,20 @@ export default function Dashboard() {
                   boxShadow: "0px 0px 0px rgba(0,0,0,0)",
                   backgroundColor: "#ffffff"
                 }}
-                transition={noShowCount30Days > 0 ? {
+                transition={totalNoShowCount > 0 ? {
                   repeat: Infinity,
                   duration: 2,
                   ease: "easeInOut"
                 } : undefined}
                 className="rounded-xl shadow-xs border p-2 flex flex-col items-center justify-center text-center cursor-pointer"
                 onClick={() => { setActiveTab('ALL_TICKETS'); setAllTicketsSubTab('MISSED'); }}
-                title="Click to view last 30 days missed flights"
+                title="Click to view all missed flights"
               >
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1 text-center">No Shows (30d)</span>
-                <span className={`text-base font-black ${noShowCount30Days > 0 ? 'text-red-600' : 'text-slate-800'} leading-none`}>{noShowCount30Days}</span>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1 text-center">No Shows (Total)</span>
+                <span className={`text-base font-black ${totalNoShowCount > 0 ? 'text-red-600' : 'text-slate-800'} leading-none`}>{totalNoShowCount}</span>
+                {noShowCount30Days > 0 && (
+                  <span className="text-[8px] font-bold text-red-500/80 mt-0.5">({noShowCount30Days} in 30d)</span>
+                )}
               </motion.div>
             </div>
 
@@ -2354,8 +2342,8 @@ export default function Dashboard() {
                 <motion.div 
                   onClick={() => { setActiveTab('ALL_TICKETS'); setAllTicketsSubTab('MISSED'); }} 
                   className="rounded-2xl shadow-sm border p-6 flex flex-col items-start cursor-pointer transition-all duration-300 relative overflow-hidden group"
-                  title="Click to view all last 30 days missed flights"
-                  animate={noShowCount30Days > 0 ? {
+                  title="Click to view all missed flights"
+                  animate={totalNoShowCount > 0 ? {
                     borderColor: ["#fecaca", "#ef4444", "#fecaca"],
                     boxShadow: ["0px 0px 0px rgba(239, 68, 68, 0)", "0px 0px 10px rgba(239, 68, 68, 0.4)", "0px 0px 0px rgba(239, 68, 68, 0)"],
                     backgroundColor: ["#ffffff", "#fff5f5", "#ffffff"]
@@ -2364,15 +2352,15 @@ export default function Dashboard() {
                     boxShadow: "0px 0px 0px rgba(0,0,0,0)",
                     backgroundColor: "#ffffff"
                   }}
-                  transition={noShowCount30Days > 0 ? {
+                  transition={totalNoShowCount > 0 ? {
                     repeat: Infinity,
                     duration: 2,
                     ease: "easeInOut"
                   } : undefined}
                 >
                   <div className="flex items-center justify-between w-full">
-                    <span className="text-[11px] font-bold text-red-600 uppercase tracking-widest">No-Shows (30 Days)</span>
-                    {noShowCount30Days > 0 && (
+                    <span className="text-[11px] font-bold text-red-600 uppercase tracking-widest">Total No-Shows</span>
+                    {totalNoShowCount > 0 && (
                       <span className="relative flex h-2.5 w-2.5">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-600"></span>
@@ -2380,8 +2368,8 @@ export default function Dashboard() {
                     )}
                   </div>
                   <div className="flex flex-col mt-2">
-                    <span className="text-4xl font-extrabold text-red-600 tracking-tight">{noShowCount30Days}</span>
-                    <span className="text-[10px] font-semibold text-slate-400 mt-1">Passengers in last 30d</span>
+                    <span className="text-4xl font-extrabold text-red-600 tracking-tight">{totalNoShowCount}</span>
+                    <span className="text-[10px] font-semibold text-slate-400 mt-1">{noShowCount30Days} in last 30d</span>
                   </div>
                 </motion.div>
                 <div onClick={() => {
@@ -3286,9 +3274,9 @@ export default function Dashboard() {
                 }`}
               >
                 <AlertCircle className={`w-3.5 h-3.5 ${allTicketsSubTab === 'MISSED' ? 'text-white' : 'text-rose-600'}`} />
-                {noShowCount30Days > 0 && (
+                {totalNoShowCount > 0 && (
                   <span className={`inline-flex items-center justify-center text-[10px] font-black px-1.5 py-0.5 rounded-full ${allTicketsSubTab === 'MISSED' ? 'bg-white text-rose-600' : 'bg-rose-500 text-white'}`}>
-                    {noShowCount30Days}
+                    {totalNoShowCount}
                   </span>
                 )}
                 Flight Missed list (No Show)
