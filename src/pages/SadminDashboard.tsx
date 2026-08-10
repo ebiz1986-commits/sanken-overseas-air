@@ -1847,7 +1847,7 @@ export default function SadminDashboard() {
                                 <p className="text-[10px] text-slate-400 font-semibold">{t.category || 'Travel'}</p>
                               </div>
                               <div className="text-right">
-                                <span className="font-extrabold text-slate-950">{t.currency === 'LKR' ? 'LKR ' : '$'}{Number(t.approved_rate).toLocaleString()}</span>
+                                <span className="font-extrabold text-slate-950">{(t.currency || '').toUpperCase() === 'LKR' ? 'LKR ' : '$'}{Number(t.approved_rate).toLocaleString()}</span>
                                 <p className="text-[10px] text-slate-400 font-medium">Entered: {format(new Date(t.created_at), 'dd MMM')}</p>
                               </div>
                             </div>
@@ -1926,7 +1926,7 @@ export default function SadminDashboard() {
                                     <p className="font-black text-sky-600 outline-none hover:underline cursor-pointer text-xs" onClick={() => openTicketDrawer(po)}>
                                       {po.passenger_name}
                                     </p>
-                                    <p className="text-slate-900 font-bold mt-0.5">Amt: {po.currency === 'LKR' ? 'LKR ' : '$'}{Number(po.approved_rate).toLocaleString()}</p>
+                                    <p className="text-slate-900 font-bold mt-0.5">Amt: {(po.currency || '').toUpperCase() === 'LKR' ? 'LKR ' : '$'}{Number(po.approved_rate).toLocaleString()}</p>
                                   </div>
                                   <span className="text-[9px] font-extrabold text-slate-500 uppercase">
                                     Age: {po.po_date ? safeDiffDays(new Date(), po.po_date) : 0}d
@@ -2235,7 +2235,7 @@ export default function SadminDashboard() {
                                       </span>
                                     </td>
                                     <td className="px-4 py-3.5 text-right font-black text-slate-950">
-                                      {ov.currency === 'LKR' ? 'LKR ' : '$'}{Number(ov.amount).toLocaleString()}
+                                      {(ov.currency || '').toUpperCase() === 'LKR' ? 'LKR ' : '$'}{Number(ov.amount).toLocaleString()}
                                     </td>
                                   </tr>
                                 );
@@ -2278,7 +2278,7 @@ export default function SadminDashboard() {
                               <CartesianGrid strokeDasharray="3 3" vertical={false} />
                               <XAxis dataKey="name" tick={{ fontSize: 9 }} />
                               <YAxis tick={{ fontSize: 9 }} />
-                              <Tooltip formatter={(value, name, props) => `${props.payload.currency === 'LKR' ? 'LKR ' : '$'}${Number(value).toLocaleString()}`} />
+                              <Tooltip formatter={(value, name, props) => `${(props.payload.currency || '').toUpperCase() === 'LKR' ? 'LKR ' : '$'}${Number(value).toLocaleString()}`} />
                               <Legend textAnchor="middle" />
                               <Bar dataKey="Current Month" fill="#0284c7" radius={[4, 4, 0, 0]} />
                               <Bar dataKey="Previous Month" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
@@ -2319,8 +2319,8 @@ export default function SadminDashboard() {
                                 <tr key={idx} className="transition-all duration-150 hover:shadow-[0_2px_8px_-1px_rgba(0,0,0,0.06)] hover:bg-slate-50 relative">
                                   <td className="py-2.5 font-bold text-slate-900">{item.name}</td>
                                   <td className="py-2.5 text-center font-medium text-slate-750">{item.qty}</td>
-                                  <td className="py-2.5 text-right font-black text-slate-950">{item.currency === 'LKR' ? 'LKR ' : '$'}{item.cost.toLocaleString()}</td>
-                                  <td className="py-2.5 text-right text-slate-500">{item.currency === 'LKR' ? 'LKR ' : '$'}{item.avg.toLocaleString()}</td>
+                                  <td className="py-2.5 text-right font-black text-slate-950">{(item.currency || '').toUpperCase() === 'LKR' ? 'LKR ' : '$'}{item.cost.toLocaleString()}</td>
+                                  <td className="py-2.5 text-right text-slate-500">{(item.currency || '').toUpperCase() === 'LKR' ? 'LKR ' : '$'}{item.avg.toLocaleString()}</td>
                                   <td className="py-2.5 text-center">
                                     <span className={`flex items-center justify-center font-black ${
                                       item.trend > 0 ? 'text-red-500' : 'text-green-600'
@@ -3002,7 +3002,7 @@ export default function SadminDashboard() {
                   <div>
                     <span className="text-[10px] text-slate-400 font-bold block">INVOICE AMOUNT</span>
                     <span className="font-black text-slate-950 text-sm">
-                      {selectedTicket.currency === 'LKR' ? 'LKR ' : '$'}{Number(selectedTicket.approved_rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {(selectedTicket.currency || '').toUpperCase() === 'LKR' ? 'LKR ' : '$'}{Number(selectedTicket.approved_rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>

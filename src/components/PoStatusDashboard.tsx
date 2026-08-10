@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { format } from 'date-fns';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { Search, Clock, AlertTriangle, CheckCircle, FileText, DollarSign, Building, Briefcase, Calendar, Check, Save, Download, ChevronDown, ChevronUp, Users } from 'lucide-react';
@@ -167,6 +168,41 @@ export default function PoStatusDashboard({ tickets, allProjects, fetchData, rol
     payment_invoice_numbers?: string;
     travel_agent?: string;
   }>>({});
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
+
+  // Restore draft on mount
+  useEffect(() => {
+    try {
+      const savedDraft = localStorage.getItem('draft_po_dashboard_form_states');
+      if (savedDraft) {
+        const parsed = JSON.parse(savedDraft);
+        if (parsed?.formStates && Object.keys(parsed.formStates).length > 0) {
+          setFormStates(parsed.formStates);
+          setDraftSavedAt(parsed.timestamp || 'saved');
+        }
+      }
+    } catch (e) {
+      console.warn('Failed restoring po dashboard draft', e);
+    }
+  }, []);
+
+  // Debounced auto-save effect
+  useEffect(() => {
+    if (!formStates || Object.keys(formStates).length === 0) return;
+    const timer = setTimeout(() => {
+      try {
+        const timeStr = format(new Date(), 'hh:mm:ss a');
+        localStorage.setItem('draft_po_dashboard_form_states', JSON.stringify({
+          formStates,
+          timestamp: timeStr
+        }));
+        setDraftSavedAt(timeStr);
+      } catch (e) {
+        console.warn('Auto-save error po dashboard', e);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [formStates]);
 
   // Loading state per groupKey being saved
   const [savingIds, setSavingIds] = useState<Record<string, boolean>>({});
@@ -276,6 +312,12 @@ export default function PoStatusDashboard({ tickets, allProjects, fetchData, rol
 
       await api.put('/finance/bulk-po', payload);
       
+      setFormStates(prev => {
+        const next = { ...prev };
+        delete next[groupKey];
+        return next;
+      });
+
       toast.success('Invoice and PO details updated successfully!', { id: saveToast });
       await fetchData(); // refresh top-level data
     } catch (err: any) {
@@ -341,30 +383,53 @@ export default function PoStatusDashboard({ tickets, allProjects, fetchData, rol
   return (
     <div className="space-y-6">
       {/* Elegant Toggle Tabs */}
-      <div className="flex border-b border-slate-200">
-        <button
-          type="button"
-          onClick={() => setShowPaidList(false)}
-          className={`pb-3 px-5 text-sm font-bold border-b-2 transition-colors focus:outline-none ${
-            !showPaidList
-              ? 'border-sky-500 text-sky-600'
-              : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          Pending PO & Payments
-        </button>
-        {role !== 'ADMIN1' && (
+      <div className="flex items-center justify-between border-b border-slate-200">
+        <div className="flex">
           <button
             type="button"
-            onClick={() => setShowPaidList(true)}
+            onClick={() => setShowPaidList(false)}
             className={`pb-3 px-5 text-sm font-bold border-b-2 transition-colors focus:outline-none ${
-              showPaidList
-                ? 'border-emerald-500 text-emerald-600'
+              !showPaidList
+                ? 'border-sky-500 text-sky-600'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
-            Completed Payments (Payment Done List)
+            Pending PO & Payments
           </button>
+          {role !== 'ADMIN1' && (
+            <button
+              type="button"
+              onClick={() => setShowPaidList(true)}
+              className={`pb-3 px-5 text-sm font-bold border-b-2 transition-colors focus:outline-none ${
+                showPaidList
+                  ? 'border-emerald-500 text-emerald-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Completed Payments (Payment Done List)
+            </button>
+          )}
+        </div>
+        {draftSavedAt && Object.keys(formStates).length > 0 && (
+          <div className="pb-2 inline-flex items-center gap-2 text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1 rounded-lg">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span>Auto-saved draft ({draftSavedAt})</span>
+            <button
+              type="button"
+              onClick={() => {
+                try { localStorage.removeItem('draft_po_dashboard_form_states'); } catch (e) {}
+                setFormStates({});
+                setDraftSavedAt(null);
+                toast.success("Draft edits discarded");
+              }}
+              className="ml-2 text-slate-500 hover:text-red-600 font-semibold underline text-xs"
+            >
+              Discard Draft
+            </button>
+          </div>
         )}
       </div>
 

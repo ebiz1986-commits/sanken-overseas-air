@@ -185,6 +185,14 @@ export const TicketProgressBar = ({ ticket }: { ticket: any }) => {
   );
 };
 
+export const getCurrSymbol = (curr?: string) => {
+  if (!curr) return '$';
+  const u = curr.trim().toUpperCase();
+  if (u === 'LKR') return 'LKR ';
+  if (u === 'USD') return '$';
+  return `${u} `;
+};
+
 export const renderStatusBadge = (status: string) => {
   const badgeConfig: Record<string, { classes: string; label: string; tooltip: string; pulse?: boolean }> = {
     'COMPLETED': { 
@@ -723,7 +731,7 @@ export default function Dashboard() {
     const poPendingByAgent: Record<string, { USD: number; LKR: number; count: number }> = {};
 
     (tickets || []).forEach(t => {
-      const isLKR = t.currency === 'LKR';
+      const isLKR = (t.currency || '').toUpperCase() === 'LKR';
       const agent = (t.travel_agent && String(t.travel_agent).trim()) || 'No Agency';
 
       let isInvPending = false;
@@ -816,7 +824,7 @@ export default function Dashboard() {
     };
 
     (tickets || []).forEach(t => {
-      const isLKR = t.currency === 'LKR';
+      const isLKR = (t.currency || '').toUpperCase() === 'LKR';
       if (t.travel_agent && String(t.travel_agent).trim()) {
         const agent = String(t.travel_agent).trim();
         if (!stats[agent]) {
@@ -1060,7 +1068,7 @@ export default function Dashboard() {
         });
       }
 
-      const isLKR = t.currency === 'LKR';
+      const isLKR = (t.currency || '').toUpperCase() === 'LKR';
       const cost = Number(t.approved_rate) || Number(t.invoice_amount) || Number(t.price) || Number(t.other_invoice_amount) || 0;
       
       const typeStr = String(t.ticket_type || '').toUpperCase();
@@ -3983,12 +3991,12 @@ export default function Dashboard() {
                           <td className="px-2 py-1.5 whitespace-nowrap text-[11px] text-slate-600">{t.company || '-'}</td>
                           <td className="px-2 py-1.5 whitespace-nowrap text-[11px] text-slate-600">{t.ticket_arranged_date ? new Date(t.ticket_arranged_date).toLocaleDateString() : '-'}</td>
                           <td className="px-2 py-1.5 whitespace-nowrap text-[11px] text-slate-600">
-                            {t.approved_rate ? `${t.approved_rate.toLocaleString()}` : '-'}
+                            {t.approved_rate ? `${getCurrSymbol(t.currency)}${t.approved_rate.toLocaleString()}` : '-'}
                           </td>
                           <td className="px-2 py-1.5 whitespace-nowrap text-[11px] text-slate-600">{t.travel_agent || '-'}</td>
                           <td className="px-2 py-1.5 whitespace-nowrap text-[11px] text-slate-600">{t.rescheduled_ticket_date ? new Date(t.rescheduled_ticket_date).toLocaleDateString() : '-'}</td>
                           <td className="px-2 py-1.5 whitespace-nowrap text-[11px] text-slate-600">
-                            {t.rescheduled_ticket_amount ? `${t.rescheduled_ticket_amount.toLocaleString()}` : '-'}
+                            {t.rescheduled_ticket_amount ? `${getCurrSymbol(t.currency)}${t.rescheduled_ticket_amount.toLocaleString()}` : '-'}
                           </td>
                           <td className="px-2 py-1.5 whitespace-nowrap text-[11px] text-slate-600">{t.rescheduled_ticket_agent || '-'}</td>
                           <td className="px-2 py-1.5 whitespace-nowrap text-[11px] text-slate-600">
@@ -4149,15 +4157,15 @@ export default function Dashboard() {
                                 <div className="flex flex-col gap-0.5">
                                   <div className="flex items-center gap-1">
                                     <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1 rounded leading-none py-0.5" title="Original Ticket Approved Cost">1st</span>
-                                    <span className="text-slate-600 font-medium">${Number(t.approved_rate || t.price || 0).toLocaleString()}</span>
+                                    <span className="text-slate-600 font-medium">{getCurrSymbol(t.currency)}{Number(t.approved_rate || t.price || 0).toLocaleString()}</span>
                                   </div>
                                   <div className="flex items-center gap-1">
                                     <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1 rounded leading-none py-0.5" title="Rescheduled Ticket Approved Cost">2nd</span>
-                                    <span className="text-slate-800 font-bold">${Number(t.rescheduled_ticket_amount || 0).toLocaleString()}</span>
+                                    <span className="text-slate-800 font-bold">{getCurrSymbol(t.currency)}{Number(t.rescheduled_ticket_amount || 0).toLocaleString()}</span>
                                   </div>
                                 </div>
                               ) : (
-                                t.approved_rate ? `$${Number(t.approved_rate).toLocaleString()}` : '-'
+                                t.approved_rate ? `${getCurrSymbol(t.currency)}${Number(t.approved_rate).toLocaleString()}` : '-'
                               )}
                             </td>
                           )}
@@ -4171,7 +4179,7 @@ export default function Dashboard() {
                                       <div>
                                         <span className="font-mono text-slate-600 text-[11px] block leading-none">{t.invoice_number || t.first_invoice_number}</span>
                                         {(t.invoice_amount || t.first_invoice_amount) && (
-                                          <span className="text-[10px] text-slate-500">${Number(t.invoice_amount || t.first_invoice_amount).toLocaleString()}</span>
+                                          <span className="text-[10px] text-slate-500">{getCurrSymbol(t.currency)}{Number(t.invoice_amount || t.first_invoice_amount).toLocaleString()}</span>
                                         )}
                                       </div>
                                     </div>
@@ -4187,7 +4195,7 @@ export default function Dashboard() {
                                       <div>
                                         <span className="font-mono text-slate-800 font-semibold text-[11px] block leading-none">{t.other_invoice_number}</span>
                                         {t.rescheduled_ticket_amount && (
-                                          <span className="text-[10px] text-orange-600 font-medium">${Number(t.rescheduled_ticket_amount).toLocaleString()}</span>
+                                          <span className="text-[10px] text-orange-600 font-medium">{getCurrSymbol(t.currency)}{Number(t.rescheduled_ticket_amount).toLocaleString()}</span>
                                         )}
                                       </div>
                                     </div>
@@ -4208,7 +4216,7 @@ export default function Dashboard() {
                                   <div>
                                     <span className="font-mono text-slate-800">{t.invoice_number || t.first_invoice_number}</span>
                                     {(t.invoice_amount || t.first_invoice_amount) && (
-                                      <span className="block text-[10px] text-slate-500">${Number(t.invoice_amount || t.first_invoice_amount).toLocaleString()}</span>
+                                      <span className="block text-[10px] text-slate-500">{getCurrSymbol(t.currency)}{Number(t.invoice_amount || t.first_invoice_amount).toLocaleString()}</span>
                                     )}
                                     {t.po_status === 'payment done' && (
                                       <span className="inline-flex items-center px-1.5 py-0.25 rounded text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-100 mt-0.5 uppercase tracking-wide">
@@ -4317,15 +4325,15 @@ export default function Dashboard() {
                                 <div className="flex flex-col gap-0.5">
                                   <div className="flex items-center gap-1">
                                     <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1 rounded leading-none py-0.5" title="Original Ticket Approved Cost">1st</span>
-                                    <span className="text-slate-600 font-medium">${Number(t.approved_rate || t.price || 0).toLocaleString()}</span>
+                                    <span className="text-slate-600 font-medium">{getCurrSymbol(t.currency)}{Number(t.approved_rate || t.price || 0).toLocaleString()}</span>
                                   </div>
                                   <div className="flex items-center gap-1">
                                     <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1 rounded leading-none py-0.5" title="Rescheduled Ticket Approved Cost">2nd</span>
-                                    <span className="text-slate-800 font-bold">${Number(t.rescheduled_ticket_amount || 0).toLocaleString()}</span>
+                                    <span className="text-slate-800 font-bold">{getCurrSymbol(t.currency)}{Number(t.rescheduled_ticket_amount || 0).toLocaleString()}</span>
                                   </div>
                                 </div>
                               ) : (
-                                t.approved_rate ? `$${Number(t.approved_rate).toLocaleString()}` : '-'
+                                t.approved_rate ? `${getCurrSymbol(t.currency)}${Number(t.approved_rate).toLocaleString()}` : '-'
                               )}
                             </td>
                           )}
@@ -4339,7 +4347,7 @@ export default function Dashboard() {
                                       <div>
                                         <span className="font-mono text-slate-600 text-[11px] block leading-none">{t.invoice_number || t.first_invoice_number}</span>
                                         {(t.invoice_amount || t.first_invoice_amount) && (
-                                          <span className="text-[10px] text-slate-500">${Number(t.invoice_amount || t.first_invoice_amount).toLocaleString()}</span>
+                                          <span className="text-[10px] text-slate-500">{getCurrSymbol(t.currency)}{Number(t.invoice_amount || t.first_invoice_amount).toLocaleString()}</span>
                                         )}
                                       </div>
                                     </div>
@@ -4355,7 +4363,7 @@ export default function Dashboard() {
                                       <div>
                                         <span className="font-mono text-slate-800 font-semibold text-[11px] block leading-none">{t.other_invoice_number}</span>
                                         {t.rescheduled_ticket_amount && (
-                                          <span className="text-[10px] text-orange-600 font-medium">${Number(t.rescheduled_ticket_amount).toLocaleString()}</span>
+                                          <span className="text-[10px] text-orange-600 font-medium">{getCurrSymbol(t.currency)}{Number(t.rescheduled_ticket_amount).toLocaleString()}</span>
                                         )}
                                       </div>
                                     </div>
@@ -4376,7 +4384,7 @@ export default function Dashboard() {
                                   <div>
                                     <span className="font-mono text-slate-800">{t.invoice_number || t.first_invoice_number}</span>
                                     {(t.invoice_amount || t.first_invoice_amount) && (
-                                      <span className="block text-[10px] text-slate-500">${Number(t.invoice_amount || t.first_invoice_amount).toLocaleString()}</span>
+                                      <span className="block text-[10px] text-slate-500">{getCurrSymbol(t.currency)}{Number(t.invoice_amount || t.first_invoice_amount).toLocaleString()}</span>
                                     )}
                                     {t.po_status === 'payment done' && (
                                       <span className="inline-flex items-center px-1.5 py-0.25 rounded text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-100 mt-0.5 uppercase tracking-wide">
@@ -4497,7 +4505,7 @@ export default function Dashboard() {
                                 </div>
                                 <div>
                                   <strong className="block text-slate-500 text-xs uppercase tracking-wider mb-1">Invoice Amount</strong>
-                                  {t.invoice_amount ? (t.currency === 'LKR' ? `LKR ${t.invoice_amount.toLocaleString()}` : `$${t.invoice_amount.toLocaleString()}`) : '-'}
+                                  {t.invoice_amount ? `${getCurrSymbol(t.currency)}${t.invoice_amount.toLocaleString()}` : '-'}
                                 </div>
                                 <div>
                                   <strong className="block text-slate-500 text-xs uppercase tracking-wider mb-1">PO Status</strong>
@@ -4521,7 +4529,7 @@ export default function Dashboard() {
                                   </div>
                                   <div>
                                     <strong className="block text-slate-500 text-xs uppercase tracking-wider mb-1">Rescheduled Amount</strong>
-                                    {t.rescheduled_ticket_amount ? (t.currency === 'LKR' ? `LKR ${t.rescheduled_ticket_amount.toLocaleString()}` : `$${t.rescheduled_ticket_amount.toLocaleString()}`) : '-'}
+                                    {t.rescheduled_ticket_amount ? `${getCurrSymbol(t.currency)}${t.rescheduled_ticket_amount.toLocaleString()}` : '-'}
                                   </div>
                                   <div>
                                     <strong className="block text-slate-500 text-xs uppercase tracking-wider mb-1">Rescheduled PO Status</strong>
@@ -5138,7 +5146,7 @@ export default function Dashboard() {
                             singleUnitTotalCost = matchedTickets.reduce((sum: number, t: any) => sum + getTicketCost(t), 0);
                           }
                         }
-                        const isLkrGroup = subTickets[0]?.currency === 'LKR';
+                        const isLkrGroup = (subTickets[0]?.currency || '').toUpperCase() === 'LKR';
 
                         const projectNamesWithPOs = Array.from(
                           new Set(
@@ -5680,7 +5688,7 @@ export default function Dashboard() {
                                             <td className="px-3 py-2.5">
                                               <div className="flex flex-col items-start gap-0.5">
                                                 <span className={`inline-flex items-center px-1.5 py-0.5 rounded-lg font-mono text-[11px] font-black select-none ${holdsMissed ? 'bg-rose-100 border border-rose-200 text-red-700 line-through decoration-red-500 decoration-2' : 'bg-slate-100 border border-slate-200 text-slate-700'}`}>
-                                                  {t.currency === 'LKR' ? 'LKR ' : '$'}{getTicketCost(t).toLocaleString()}
+                                                  {getCurrSymbol(t.currency)}{getTicketCost(t).toLocaleString()}
                                                 </span>
                                                 {holdsMissed && (
                                                   <span className="text-[8px] font-black text-red-650 tracking-tight ml-1 animate-pulse">

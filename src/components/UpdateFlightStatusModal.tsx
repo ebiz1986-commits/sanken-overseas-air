@@ -22,6 +22,10 @@ export default function UpdateFlightStatusModal({ ticket, isOpen, onClose, onSuc
     setLoading(true);
     try {
       await api.put(`/tickets/${ticket.id}/stage2`, formData);
+      try {
+        localStorage.removeItem(`draft_flight_status_${ticket.id}`);
+      } catch (e) {}
+      setDraftSavedAt(null);
       toast.success('Flight status updated successfully');
       onSuccess();
     } catch (err: any) {
@@ -102,10 +106,12 @@ export default function UpdateFlightStatusModal({ ticket, isOpen, onClose, onSuc
     await scanInvoiceFile(base64Data);
   };
 
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
+
   useEffect(() => {
     if (ticket && isOpen) {
       const isSecondTicket = !!(ticket.rescheduled_departure_date || ticket.other_invoice_number);
-      setFormData({
+      let initialData = {
         departure_date: ticket.departure_date || '',
         arrival_date: ticket.arrival_date || '',
         flight_status: isSecondTicket ? 'NO_SHOW' : (ticket.flight_status || 'PENDING'),
@@ -118,9 +124,42 @@ export default function UpdateFlightStatusModal({ ticket, isOpen, onClose, onSuc
         other_invoice: ticket.other_invoice || '',
         other_invoice_number: ticket.other_invoice_number || '',
         other_invoice_date: ticket.other_invoice_date || ''
-      });
+      };
+
+      try {
+        const savedDraft = localStorage.getItem(`draft_flight_status_${ticket.id}`);
+        if (savedDraft) {
+          const parsed = JSON.parse(savedDraft);
+          if (parsed?.data) {
+            initialData = parsed.data;
+            setDraftSavedAt(parsed.timestamp || 'saved');
+          }
+        }
+      } catch (e) {
+        console.warn('Failed restoring flight status draft', e);
+      }
+
+      setFormData(initialData);
     }
   }, [ticket, isOpen]);
+
+  // Debounced auto-save effect
+  useEffect(() => {
+    if (!isOpen || !ticket) return;
+    const timer = setTimeout(() => {
+      try {
+        const timeStr = format(new Date(), 'hh:mm:ss a');
+        localStorage.setItem(`draft_flight_status_${ticket.id}`, JSON.stringify({
+          data: formData,
+          timestamp: timeStr
+        }));
+        setDraftSavedAt(timeStr);
+      } catch (e) {
+        console.warn('Auto-save error flight status', e);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [formData, isOpen, ticket]);
 
   useEffect(() => {
     const fetchAgents = async () => {
@@ -415,11 +454,50 @@ export default function UpdateFlightStatusModal({ ticket, isOpen, onClose, onSuc
             </div>
           )}
 
-          <div className="mt-6 flex justify-end space-x-3">
-            <button type="button" onClick={onClose} className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors">Cancel</button>
-            <button type="submit" disabled={loading} className="px-4 py-2 bg-sky-600 text-white font-medium rounded-lg hover:bg-sky-700 transition-colors disabled:opacity-50">
-              {loading ? 'Saving...' : 'Update Status'}
-            </button>
+          <div className="mt-6 flex items-center justify-between">
+            {draftSavedAt ? (
+              <div className="inline-flex items-center gap-2 text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1.5 rounded-lg">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span>Auto-saved draft ({draftSavedAt})</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    try { localStorage.removeItem(`draft_flight_status_${ticket?.id}`); } catch (e) {}
+                    setDraftSavedAt(null);
+                    if (ticket) {
+                      const isSecondTicket = !!(ticket.rescheduled_departure_date || ticket.other_invoice_number);
+                      setFormData({
+                        departure_date: ticket.departure_date || '',
+                        arrival_date: ticket.arrival_date || '',
+                        flight_status: isSecondTicket ? 'NO_SHOW' : (ticket.flight_status || 'PENDING'),
+                        rescheduled_departure_date: ticket.rescheduled_departure_date || '',
+                        rescheduled_ticket_amount: ticket.rescheduled_ticket_amount || '',
+                        rescheduled_ticket_agent: ticket.rescheduled_ticket_agent || '',
+                        rescheduled_ticket_date: ticket.rescheduled_ticket_date || '',
+                        rescheduled_flight_status: ticket.rescheduled_flight_status || 'PENDING',
+                        rescheduled_arrival_date: ticket.rescheduled_arrival_date || '',
+                        other_invoice: ticket.other_invoice || '',
+                        other_invoice_number: ticket.other_invoice_number || '',
+                        other_invoice_date: ticket.other_invoice_date || ''
+                      });
+                    }
+                    toast.success("Flight status draft discarded");
+                  }}
+                  className="ml-2 text-slate-500 hover:text-red-600 font-semibold underline text-xs"
+                >
+                  Discard Draft
+                </button>
+              </div>
+            ) : <div />}
+            <div className="flex space-x-3">
+              <button type="button" onClick={onClose} className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors">Cancel</button>
+              <button type="submit" disabled={loading} className="px-4 py-2 bg-sky-600 text-white font-medium rounded-lg hover:bg-sky-700 transition-colors disabled:opacity-50">
+                {loading ? 'Saving...' : 'Update Status'}
+              </button>
+            </div>
           </div>
         </form>
       </div>

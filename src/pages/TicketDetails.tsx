@@ -74,9 +74,27 @@ export default function TicketDetails() {
   });
 
   const [activeInvoiceType, setActiveInvoiceType] = useState<'first' | 'other'>('first');
+  const [stage2DraftSavedAt, setStage2DraftSavedAt] = useState<string | null>(null);
+  const [stage3DraftSavedAt, setStage3DraftSavedAt] = useState<string | null>(null);
 
   const updateStage3FormData = (ticket: any, type: 'first' | 'other') => {
     if (!ticket) return;
+
+    // Check if unsaved draft exists
+    try {
+      const savedDraftRaw = localStorage.getItem(`draft_tkt_${ticket.id}_stage3_${type}`);
+      if (savedDraftRaw) {
+        const parsed = JSON.parse(savedDraftRaw);
+        if (parsed?.data) {
+          setStage3Data(parsed.data);
+          setStage3DraftSavedAt(parsed.timestamp || 'saved');
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed restoring Stage 3 draft', e);
+    }
+
     if (type === 'other') {
       setStage3Data({
         po_number: ticket.other_po_number || '',
@@ -161,7 +179,9 @@ export default function TicketDetails() {
       
       // Initialize form data
       const hasSecondTicket = !!(newTicket.rescheduled_departure_date || newTicket.other_invoice_number);
-      setStage2Data({
+      
+      // Check if unsaved Stage 2 draft exists
+      let initialStage2 = {
         departure_date: newTicket.departure_date || '',
         arrival_date: newTicket.arrival_date || '',
         flight_status: hasSecondTicket ? 'NO_SHOW' : (newTicket.flight_status || 'PENDING'),
@@ -171,7 +191,22 @@ export default function TicketDetails() {
         rescheduled_ticket_date: newTicket.rescheduled_ticket_date || '',
         rescheduled_flight_status: newTicket.rescheduled_flight_status || 'PENDING',
         rescheduled_arrival_date: newTicket.rescheduled_arrival_date || ''
-      });
+      };
+
+      try {
+        const savedStage2Draft = localStorage.getItem(`draft_tkt_${newTicket.id}_stage2`);
+        if (savedStage2Draft) {
+          const parsed = JSON.parse(savedStage2Draft);
+          if (parsed?.data) {
+            initialStage2 = parsed.data;
+            setStage2DraftSavedAt(parsed.timestamp || 'saved');
+          }
+        }
+      } catch (e) {
+        console.warn('Failed restoring Stage 2 draft', e);
+      }
+
+      setStage2Data(initialStage2);
       
       updateStage3FormData(newTicket, activeInvoiceType);
       
@@ -182,6 +217,42 @@ export default function TicketDetails() {
       setLoading(false);
     }
   };
+
+  // Auto-save Stage 2 draft to localStorage
+  useEffect(() => {
+    if (!id || loading || !ticketData) return;
+    const timer = setTimeout(() => {
+      try {
+        const timeStr = format(new Date(), 'hh:mm:ss a');
+        localStorage.setItem(`draft_tkt_${id}_stage2`, JSON.stringify({
+          data: stage2Data,
+          timestamp: timeStr
+        }));
+        setStage2DraftSavedAt(timeStr);
+      } catch (e) {
+        console.warn('Auto-save error stage2', e);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [stage2Data, id, loading, ticketData]);
+
+  // Auto-save Stage 3 draft to localStorage
+  useEffect(() => {
+    if (!id || loading || !ticketData) return;
+    const timer = setTimeout(() => {
+      try {
+        const timeStr = format(new Date(), 'hh:mm:ss a');
+        localStorage.setItem(`draft_tkt_${id}_stage3_${activeInvoiceType}`, JSON.stringify({
+          data: stage3Data,
+          timestamp: timeStr
+        }));
+        setStage3DraftSavedAt(timeStr);
+      } catch (e) {
+        console.warn('Auto-save error stage3', e);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [stage3Data, id, activeInvoiceType, loading, ticketData]);
 
   const handleDeleteTicket = async () => {
     console.log("handleDeleteTicket: role =", role);
@@ -255,6 +326,10 @@ export default function TicketDetails() {
     setSavingStage2(true);
     try {
       await api.put(`/tickets/${id}/stage2`, stage2Data);
+      try {
+        localStorage.removeItem(`draft_tkt_${id}_stage2`);
+      } catch (e) {}
+      setStage2DraftSavedAt(null);
       toast.success('Stage 2 updated successfully');
       fetchData();
     } catch (error: any) {
@@ -273,6 +348,10 @@ export default function TicketDetails() {
     setSavingStage3(true);
     try {
       await api.put(`/tickets/${id}/stage3`, stage3Data);
+      try {
+        localStorage.removeItem(`draft_tkt_${id}_stage3_${activeInvoiceType}`);
+      } catch (e) {}
+      setStage3DraftSavedAt(null);
       toast.success('Stage 3 updated successfully');
       fetchData();
     } catch (error: any) {
@@ -927,7 +1006,28 @@ export default function TicketDetails() {
                         </div>
                       </div>
                     )}
-                    <div className="flex justify-end mt-3 items-center gap-2">
+                    <div className="flex flex-wrap justify-between mt-3 items-center gap-2">
+                      {stage2DraftSavedAt && (
+                        <div className="inline-flex items-center gap-2 text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-md">
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                          </span>
+                          <span>Auto-saved draft ({stage2DraftSavedAt})</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              try { localStorage.removeItem(`draft_tkt_${id}_stage2`); } catch (e) {}
+                              setStage2DraftSavedAt(null);
+                              fetchData();
+                              toast.success("Stage 2 draft discarded");
+                            }}
+                            className="ml-1 text-slate-500 hover:text-red-600 font-semibold underline text-[11px]"
+                          >
+                            Discard Draft
+                          </button>
+                        </div>
+                      )}
                       {isLocked && role !== 'ADMIN' && role !== 'ADMIN1' ? (
                         <span className="text-xs text-amber-600 font-semibold bg-amber-50 px-2.5 py-1.5 rounded border border-amber-200 inline-flex items-center gap-1">
                           🔒 Stage 2 Locked (PO Assigned)
@@ -1588,7 +1688,28 @@ export default function TicketDetails() {
                     )}
                   </div>
                   {!ticketData.stage3_completed && (
-                    <div className="flex justify-end">
+                    <div className="flex flex-wrap justify-between items-center gap-2 pt-2 border-t border-slate-100">
+                      {stage3DraftSavedAt ? (
+                        <div className="inline-flex items-center gap-2 text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1.5 rounded-lg">
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                          </span>
+                          <span>Auto-saved draft ({stage3DraftSavedAt})</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              try { localStorage.removeItem(`draft_tkt_${id}_stage3_${activeInvoiceType}`); } catch (e) {}
+                              setStage3DraftSavedAt(null);
+                              updateStage3FormData(ticketData, activeInvoiceType);
+                              toast.success("Stage 3 draft discarded");
+                            }}
+                            className="ml-2 text-slate-500 hover:text-red-600 font-semibold underline text-xs"
+                          >
+                            Discard Draft
+                          </button>
+                        </div>
+                      ) : <div />}
                       <button type="submit" disabled={savingStage3} className="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1">
                         <Save className="h-4 w-4 mr-1" aria-hidden="true" /> {savingStage3 ? 'Saving...' : 'Save ERP Update'}
                       </button>

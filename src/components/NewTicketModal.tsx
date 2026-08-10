@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { format } from 'date-fns';
 import { X, FileText, AlertCircle, Upload, Download } from 'lucide-react';
 import api from '../api';
 import toast from 'react-hot-toast';
@@ -256,6 +257,7 @@ export default function NewTicketModal({ isOpen = true, onClose, projects, ticke
 
   const [isAddingNewAgent, setIsAddingNewAgent] = useState(false);
   const [newAgentName, setNewAgentName] = useState('');
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -266,8 +268,44 @@ export default function NewTicketModal({ isOpen = true, onClose, projects, ticke
         api.get('/tickets?limit=1500').then(res => setLoadedTickets(res.data?.tickets || res.data || [])).catch(console.error);
       }
       clearErrors();
+
+      // Restore unsaved draft if present
+      try {
+        const savedDraft = localStorage.getItem('draft_new_ticket');
+        if (savedDraft) {
+          const parsed = JSON.parse(savedDraft);
+          if (parsed?.formData) {
+            setFormData(parsed.formData);
+            if (Array.isArray(parsed.bulkPassengers) && parsed.bulkPassengers.length > 0) {
+              setBulkPassengers(parsed.bulkPassengers);
+            }
+            setDraftSavedAt(parsed.timestamp || 'saved');
+          }
+        }
+      } catch (e) {
+        console.warn('Failed restoring new ticket draft', e);
+      }
     }
   }, [isOpen, tickets]);
+
+  // Debounced auto-save effect
+  useEffect(() => {
+    if (!isOpen) return;
+    const timer = setTimeout(() => {
+      try {
+        const timeStr = format(new Date(), 'hh:mm:ss a');
+        localStorage.setItem('draft_new_ticket', JSON.stringify({
+          formData,
+          bulkPassengers,
+          timestamp: timeStr
+        }));
+        setDraftSavedAt(timeStr);
+      } catch (e) {
+        console.warn('Auto-save error new ticket', e);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [formData, bulkPassengers, isOpen]);
 
   const handleSaveNewAgent = async () => {
     if (!newAgentName.trim()) return;
@@ -395,6 +433,10 @@ export default function NewTicketModal({ isOpen = true, onClose, projects, ticke
       }
       
        // Reset form
+       try {
+         localStorage.removeItem('draft_new_ticket');
+       } catch (e) {}
+       setDraftSavedAt(null);
        setFormData({
          passenger_name: '',
          pp_number: '',
@@ -1128,15 +1170,60 @@ export default function NewTicketModal({ isOpen = true, onClose, projects, ticke
           </form>
         </div>
 
-        <div className="p-6 border-t border-slate-200 bg-slate-50 flex justify-end space-x-3 mt-auto">
-          {!isEmbedded && onClose && (
-            <button type="button" onClick={onClose} className="px-5 py-2 text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 font-medium transition-colors">
-              Cancel
+        <div className="p-6 border-t border-slate-200 bg-slate-50 flex items-center justify-between mt-auto">
+          {draftSavedAt ? (
+            <div className="inline-flex items-center gap-2 text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1.5 rounded-lg">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span>Auto-saved draft ({draftSavedAt})</span>
+              <button
+                type="button"
+                onClick={() => {
+                  try { localStorage.removeItem('draft_new_ticket'); } catch (e) {}
+                  setDraftSavedAt(null);
+                  setFormData({
+                    passenger_name: '',
+                    pp_number: '',
+                    job_category: '',
+                    ticket_type: 'ONE_WAY',
+                    company: '',
+                    project_id: '',
+                    project_ids: [],
+                    project_pos: {},
+                    po_number: '',
+                    ticket_arranged_date: '',
+                    approved_rate: 0,
+                    currency: 'USD',
+                    travel_agent: '',
+                    route: '',
+                    departure_date: '',
+                    arrival_date: '',
+                    first_atbf: '',
+                    first_invoice: '',
+                    subcontractor_entitlement_applied: false,
+                    flight_status: 'PENDING'
+                  });
+                  setBulkPassengers([{ id: 'initial-row-0', passenger_name: '', pp_number: '', approved_rate: 0, job_category: '' }]);
+                  toast.success("New ticket draft discarded");
+                }}
+                className="ml-2 text-slate-500 hover:text-red-600 font-semibold underline text-xs"
+              >
+                Discard Draft
+              </button>
+            </div>
+          ) : <div />}
+          <div className="flex space-x-3">
+            {!isEmbedded && onClose && (
+              <button type="button" onClick={onClose} className="px-5 py-2 text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 font-medium transition-colors">
+                Cancel
+              </button>
+            )}
+            <button type="submit" form="new-ticket-form" disabled={loading} className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">
+              {loading ? 'Saving...' : 'Create Ticket'}
             </button>
-          )}
-          <button type="submit" form="new-ticket-form" disabled={loading} className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">
-            {loading ? 'Saving...' : 'Create Ticket'}
-          </button>
+          </div>
         </div>
       </div>
   );

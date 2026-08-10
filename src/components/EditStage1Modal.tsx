@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { format } from 'date-fns';
 import { X, AlertCircle, Upload } from 'lucide-react';
 import { processAndCompressFile } from '../lib/fileCompressor';
 import api from '../api';
@@ -175,6 +176,8 @@ export default function EditStage1Modal({ isOpen, onClose, ticket, projects, tic
     });
   };
 
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
+
   useEffect(() => {
     if (isOpen && ticket) {
       api.get('/options').then(res => setOptions(res.data)).catch(console.error);
@@ -184,7 +187,8 @@ export default function EditStage1Modal({ isOpen, onClose, ticket, projects, tic
         api.get('/tickets?limit=1500').then(res => setLoadedTickets(res.data?.tickets || res.data || [])).catch(console.error);
       }
       clearErrors();
-      setFormData({
+
+      let initialData = {
         passenger_name: ticket.passenger_name || '',
         pp_number: ticket.pp_number || '',
         job_category: ticket.job_category || '',
@@ -202,9 +206,42 @@ export default function EditStage1Modal({ isOpen, onClose, ticket, projects, tic
         first_atbf: ticket.first_atbf || '',
         first_invoice: ticket.first_invoice || '',
         subcontractor_entitlement_applied: ticket.subcontractor_entitlement_applied || false,
-      });
+      };
+
+      try {
+        const savedDraft = localStorage.getItem(`draft_stage1_${ticket.id}`);
+        if (savedDraft) {
+          const parsed = JSON.parse(savedDraft);
+          if (parsed?.data) {
+            initialData = parsed.data;
+            setDraftSavedAt(parsed.timestamp || 'saved');
+          }
+        }
+      } catch (e) {
+        console.warn('Failed restoring stage1 draft', e);
+      }
+
+      setFormData(initialData);
     }
   }, [isOpen, ticket, tickets]);
+
+  // Debounced auto-save effect
+  useEffect(() => {
+    if (!isOpen || !ticket) return;
+    const timer = setTimeout(() => {
+      try {
+        const timeStr = format(new Date(), 'hh:mm:ss a');
+        localStorage.setItem(`draft_stage1_${ticket.id}`, JSON.stringify({
+          data: formData,
+          timestamp: timeStr
+        }));
+        setDraftSavedAt(timeStr);
+      } catch (e) {
+        console.warn('Auto-save error', e);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [formData, isOpen, ticket]);
 
   const handleSaveNewAgent = async () => {
     if (!newAgentName.trim()) return;
@@ -262,6 +299,10 @@ export default function EditStage1Modal({ isOpen, onClose, ticket, projects, tic
         subcontractor_entitlement_exceeded: exceeded,
         subcontractor_entitlement_exceed_by: exceed_by
       });
+      try {
+        localStorage.removeItem(`draft_stage1_${ticket.id}`);
+      } catch (e) {}
+      setDraftSavedAt(null);
       toast.success('Ticket updated successfully');
       onSuccess();
       onClose();
@@ -682,13 +723,56 @@ export default function EditStage1Modal({ isOpen, onClose, ticket, projects, tic
           </form>
         </div>
 
-        <div className="p-6 border-t border-slate-200 bg-slate-50 flex justify-end space-x-3 mt-auto">
-          <button type="button" onClick={onClose} className="px-5 py-2 text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 font-medium transition-colors">
-            Cancel
-          </button>
-          <button type="submit" form="edit-ticket-form" disabled={loading} className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">
-            {loading ? 'Saving...' : 'Save Changes'}
-          </button>
+        <div className="p-6 border-t border-slate-200 bg-slate-50 flex items-center justify-between mt-auto">
+          {draftSavedAt ? (
+            <div className="inline-flex items-center gap-2 text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1.5 rounded-lg">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span>Auto-saved draft ({draftSavedAt})</span>
+              <button
+                type="button"
+                onClick={() => {
+                  try { localStorage.removeItem(`draft_stage1_${ticket?.id}`); } catch (e) {}
+                  setDraftSavedAt(null);
+                  if (ticket) {
+                    setFormData({
+                      passenger_name: ticket.passenger_name || '',
+                      pp_number: ticket.pp_number || '',
+                      job_category: ticket.job_category || '',
+                      ticket_type: ticket.ticket_type || 'ONE_WAY',
+                      company: ticket.company || '',
+                      project_id: ticket.project_id || '',
+                      project_ids: ticket.project_ids || (ticket.project_id ? [ticket.project_id] : []) || [],
+                      project_pos: ticket.project_pos || {},
+                      po_number: ticket.po_number || '',
+                      ticket_arranged_date: ticket.ticket_arranged_date || '',
+                      approved_rate: ticket.approved_rate || 0,
+                      currency: ticket.currency || 'USD',
+                      travel_agent: ticket.travel_agent || '',
+                      route: ticket.route || '',
+                      first_atbf: ticket.first_atbf || '',
+                      first_invoice: ticket.first_invoice || '',
+                      subcontractor_entitlement_applied: ticket.subcontractor_entitlement_applied || false,
+                    });
+                  }
+                  toast.success("Draft discarded");
+                }}
+                className="ml-2 text-slate-500 hover:text-red-600 font-semibold underline text-xs"
+              >
+                Discard Draft
+              </button>
+            </div>
+          ) : <div />}
+          <div className="flex space-x-3">
+            <button type="button" onClick={onClose} className="px-5 py-2 text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 font-medium transition-colors">
+              Cancel
+            </button>
+            <button type="submit" form="edit-ticket-form" disabled={loading} className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-medium disabled:opacity-50 transition-colors">
+              {loading ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
