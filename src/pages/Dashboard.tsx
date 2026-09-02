@@ -3339,7 +3339,7 @@ export default function Dashboard() {
                 }`}
               >
                 <AlertCircle className={`w-3.5 h-3.5 ${allTicketsSubTab === 'DANGER_ZONE' ? 'text-white' : 'text-red-600'}`} />
-                Danger Zone
+                Not Use
               </button>
 
               <button
