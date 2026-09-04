@@ -481,7 +481,7 @@ export default function SadminDashboard() {
     const interval = setInterval(() => {
       loadData();
       loadDeletionRequests();
-    }, 5 * 60 * 1000); // 5 mins auto-refresh
+    }, 30 * 60 * 1000); // 30 mins auto-refresh (reduced from 5 min to cut redundant Firestore reads)
     return () => clearInterval(interval);
   }, []);
 

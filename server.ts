@@ -107,7 +107,7 @@ interface CacheEntry {
 
 const firestoreCache: { [key: string]: CacheEntry } = {};
 const staleFallbackCache: { [key: string]: any } = {};
-const CACHE_TTL_MS = 300000; // 5 minutes TTL
+const CACHE_TTL_MS = 1800000; // 30 minutes TTL (writes invalidate the cache, so data stays fresh on changes; longer TTL avoids redundant full-collection re-scans that burn Firestore reads)
 const pendingQueries: { [key: string]: Promise<any> } = {};
 const pendingDocs: { [key: string]: Promise<any> } = {};
 
