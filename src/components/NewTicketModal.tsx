@@ -6,11 +6,25 @@ import toast from 'react-hot-toast';
 import { useFormValidation } from '../hooks/useFormValidation';
 import FieldError from './FieldError';
 import { processAndCompressFile } from '../lib/fileCompressor';
+import { uploadDataUriToStorage } from '../lib/storageUpload';
 
 const isPdfUrl = (url: string | null): boolean => {
   if (!url) return false;
   return url.startsWith('data:application/pdf') || url.includes('.pdf') || url.includes('pdf;base64');
 };
+
+/** Compress a file, upload it to Firebase Storage, and return the URL (or null on failure). */
+async function compressAndUpload(file: File, prefix: string): Promise<string | null> {
+  const base64 = await processAndCompressFile(file);
+  if (!base64) return null;
+  try {
+    return await uploadDataUriToStorage(base64, prefix);
+  } catch (e) {
+    console.error('Storage upload failed', e);
+    toast.error('File upload failed. Please ensure Firebase Storage is enabled and try again.');
+    return null;
+  }
+}
 
 interface NewTicketModalProps {
   isOpen?: boolean;
@@ -987,9 +1001,9 @@ export default function NewTicketModal({ isOpen = true, onClose, projects, ticke
                             onChange={async (e) => {
                               const file = e.target.files?.[0];
                               if (file) {
-                                const base64 = await processAndCompressFile(file);
-                                if (base64) {
-                                  setFormData(prev => ({ ...prev, first_atbf: base64 }));
+                                const url = await compressAndUpload(file, 'tickets/new/first_atbf');
+                                if (url) {
+                                  setFormData(prev => ({ ...prev, first_atbf: url }));
                                 }
                               }
                             }}
@@ -1070,9 +1084,9 @@ export default function NewTicketModal({ isOpen = true, onClose, projects, ticke
                             onChange={async (e) => {
                               const file = e.target.files?.[0];
                               if (file) {
-                                const base64 = await processAndCompressFile(file);
-                                if (base64) {
-                                  setFormData(prev => ({ ...prev, first_invoice: base64 }));
+                                const url = await compressAndUpload(file, 'tickets/new/first_invoice');
+                                if (url) {
+                                  setFormData(prev => ({ ...prev, first_invoice: url }));
                                 }
                               }
                             }}
@@ -1130,11 +1144,11 @@ export default function NewTicketModal({ isOpen = true, onClose, projects, ticke
                     onChange={async (e) => {
                       const files = Array.from(e.target.files || []) as File[];
                       for (const file of files) {
-                        const base64 = await processAndCompressFile(file);
-                        if (base64) {
+                        const url = await compressAndUpload(file, 'tickets/new/attachments');
+                        if (url) {
                           setFormData(prev => ({
                             ...prev,
-                            attached_images: [...(prev.attached_images || []), base64]
+                            attached_images: [...(prev.attached_images || []), url]
                           }));
                         }
                       }

@@ -2,10 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { X, AlertCircle, Upload } from 'lucide-react';
 import { processAndCompressFile } from '../lib/fileCompressor';
+import { uploadDataUriToStorage } from '../lib/storageUpload';
 import api from '../api';
 import toast from 'react-hot-toast';
 import { useFormValidation } from '../hooks/useFormValidation';
 import FieldError from './FieldError';
+
+/** Compress a file, upload it to Firebase Storage, and return the URL (or null on failure). */
+async function compressAndUpload(file: File, prefix: string): Promise<string | null> {
+  const base64 = await processAndCompressFile(file);
+  if (!base64) return null;
+  try {
+    return await uploadDataUriToStorage(base64, prefix);
+  } catch (e) {
+    console.error('Storage upload failed', e);
+    toast.error('File upload failed. Please ensure Firebase Storage is enabled and try again.');
+    return null;
+  }
+}
 
 interface EditStage1ModalProps {
   isOpen: boolean;
@@ -658,9 +672,9 @@ export default function EditStage1Modal({ isOpen, onClose, ticket, projects, tic
                           onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (file) {
-                              const base64 = await processAndCompressFile(file);
-                              if (base64) {
-                                setFormData(prev => ({ ...prev, first_atbf: base64 }));
+                              const url = await compressAndUpload(file, `tickets/${formData.id || 'edit'}/first_atbf`);
+                              if (url) {
+                                setFormData(prev => ({ ...prev, first_atbf: url }));
                               }
                             }
                           }}
@@ -707,9 +721,9 @@ export default function EditStage1Modal({ isOpen, onClose, ticket, projects, tic
                           onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (file) {
-                              const base64 = await processAndCompressFile(file);
-                              if (base64) {
-                                setFormData(prev => ({ ...prev, first_invoice: base64 }));
+                              const url = await compressAndUpload(file, `tickets/${formData.id || 'edit'}/first_invoice`);
+                              if (url) {
+                                setFormData(prev => ({ ...prev, first_invoice: url }));
                               }
                             }
                           }}

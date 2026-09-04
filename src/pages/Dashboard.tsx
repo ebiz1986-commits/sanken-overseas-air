@@ -12,15 +12,17 @@ import UpdateFlightStatusModal from '../components/UpdateFlightStatusModal';
 import ConfirmationModal from '../components/ConfirmationModal';
 import PoStatusDashboard from '../components/PoStatusDashboard';
 import DonutChart from '../components/DonutChart';
+import { isStorageUrl } from '../lib/storageUpload';
 
 export const isPdfUrl = (url: string | null): boolean => {
   if (!url) return false;
   return url.startsWith('data:application/pdf') || url.includes('.pdf') || url.includes('pdf;base64');
 };
 
+// Storage URLs are files we host (render inline), NOT external "web links" the user pasted.
 export const isWebUrl = (url: string | null): boolean => {
   if (!url) return false;
-  return (url.startsWith('http://') || url.startsWith('https://')) && !url.startsWith('data:');
+  return (url.startsWith('http://') || url.startsWith('https://')) && !url.startsWith('data:') && !isStorageUrl(url);
 };
 
 export const getGroupSummaryStatus = (tickets: any[]) => {

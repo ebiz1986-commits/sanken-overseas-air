@@ -10,15 +10,17 @@ import FieldError from '../components/FieldError';
 import EditStage1Modal from '../components/EditStage1Modal';
 import { motion } from 'motion/react';
 import { processAndCompressFile } from '../lib/fileCompressor';
+import { isStorageUrl } from '../lib/storageUpload';
 
 export const isPdfUrl = (url: string | null): boolean => {
   if (!url) return false;
   return url.startsWith('data:application/pdf') || url.includes('.pdf') || url.includes('pdf;base64');
 };
 
+// Storage URLs are files we host (render inline), NOT external "web links" the user pasted.
 export const isWebUrl = (url: string | null): boolean => {
   if (!url) return false;
-  return (url.startsWith('http://') || url.startsWith('https://')) && !url.startsWith('data:');
+  return (url.startsWith('http://') || url.startsWith('https://')) && !url.startsWith('data:') && !isStorageUrl(url);
 };
 
 export default function TicketDetails() {

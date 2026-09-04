@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { useFormValidation } from '../hooks/useFormValidation';
 import FieldError from './FieldError';
 import ConfirmationModal from './ConfirmationModal';
+import { uploadDataUriToStorage, isPdfValue, isExternalWebLink } from '../lib/storageUpload';
 
 interface UpdateFlightStatusModalProps {
   ticket: any;
@@ -54,40 +55,33 @@ export default function UpdateFlightStatusModal({ ticket, isOpen, onClose, onSuc
     other_invoice_number: ''
   });
 
-  const isPdfUrl = (url: string) => {
-    return !!url && (url.startsWith('data:application/pdf') || url.toLowerCase().includes('.pdf'));
-  };
-
-  const isWebUrl = (url: string) => {
-    return !!url && (url.startsWith('http://') || url.startsWith('https://')) && !url.startsWith('data:');
-  };
+  // Delegate to shared classifiers so Firebase Storage URLs render as files, not as external links.
+  const isPdfUrl = (url: string) => isPdfValue(url);
+  const isWebUrl = (url: string) => isExternalWebLink(url);
 
   const scanInvoiceFile = async (base64Data: string) => {
     setIsScanningOtherInvoice(true);
     try {
-      const response = await api.post('/scan-invoice', { fileData: base64Data });
-      const extractedNo = response.data.invoice_number;
+      // Upload the file to Firebase Storage and store only the URL in Firestore (never base64).
+      const fileUrl = await uploadDataUriToStorage(base64Data, `tickets/${ticket?.id || 'new'}/other_invoice`);
+      // OCR is best-effort and runs on the raw file data; failure here must not block the upload.
+      let extractedNo = '';
+      try {
+        const response = await api.post('/scan-invoice', { fileData: base64Data });
+        extractedNo = response.data.invoice_number || '';
+      } catch (scanErr) {
+        console.error('OCR scan failed', scanErr);
+      }
       if (extractedNo) {
         toast.success(`OCR Scan: Automatically detected invoice number: "${extractedNo}"`);
-        setFormData(prev => ({
-          ...prev,
-          other_invoice: base64Data,
-          other_invoice_number: extractedNo
-        }));
+        setFormData(prev => ({ ...prev, other_invoice: fileUrl, other_invoice_number: extractedNo }));
       } else {
         toast.error("Could not auto-detect invoice number. Please enter it manually.");
-        setFormData(prev => ({
-          ...prev,
-          other_invoice: base64Data
-        }));
+        setFormData(prev => ({ ...prev, other_invoice: fileUrl }));
       }
     } catch (err: any) {
       console.error(err);
-      toast.error("Failed to auto-scan invoice. Enter it manually.");
-      setFormData(prev => ({
-        ...prev,
-        other_invoice: base64Data
-      }));
+      toast.error("Failed to upload invoice file. Please ensure Firebase Storage is enabled and try again.");
     } finally {
       setIsScanningOtherInvoice(false);
     }
@@ -95,12 +89,14 @@ export default function UpdateFlightStatusModal({ ticket, isOpen, onClose, onSuc
 
   const handleOtherInvoiceUpload = async (base64Data: string) => {
     if (base64Data.startsWith("data:image/svg")) {
-      setFormData(prev => ({
-        ...prev,
-        other_invoice: base64Data,
-        other_invoice_number: "S9F30A-R2"
-      }));
-      toast.success(`OCR Scan: Detected invoice number "S9F30A-R2"`);
+      try {
+        const fileUrl = await uploadDataUriToStorage(base64Data, `tickets/${ticket?.id || 'new'}/other_invoice`);
+        setFormData(prev => ({ ...prev, other_invoice: fileUrl, other_invoice_number: "S9F30A-R2" }));
+        toast.success(`OCR Scan: Detected invoice number "S9F30A-R2"`);
+      } catch (err) {
+        console.error(err);
+        toast.error("Failed to upload invoice file. Please ensure Firebase Storage is enabled and try again.");
+      }
       return;
     }
     await scanInvoiceFile(base64Data);
