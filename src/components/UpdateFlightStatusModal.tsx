@@ -193,7 +193,16 @@ export default function UpdateFlightStatusModal({ ticket, isOpen, onClose, onSuc
 
   const handleSubmit = async (e: any) => {
     e.preventDefault();
-    if (!validateForm(e.target as HTMLFormElement)) return;
+    const form = e.target as HTMLFormElement;
+    if (!validateForm(form)) {
+      toast.error('Please fill in all required fields highlighted in red.');
+      const firstInvalid = form.querySelector(':invalid, [aria-invalid="true"]') as HTMLElement | null;
+      if (firstInvalid) {
+        firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        try { firstInvalid.focus({ preventScroll: true }); } catch (e) {}
+      }
+      return;
+    }
 
     if (formData.rescheduled_departure_date && formData.departure_date && formData.rescheduled_departure_date < formData.departure_date) {
       toast.error('Rescheduled Departure Date cannot be before original Departure Date');
@@ -218,7 +227,7 @@ export default function UpdateFlightStatusModal({ ticket, isOpen, onClose, onSuc
           </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="p-4 overflow-y-auto max-h-[80vh]">
+        <form onSubmit={handleSubmit} noValidate className="p-4 overflow-y-auto max-h-[80vh]">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Departure Date</label>
