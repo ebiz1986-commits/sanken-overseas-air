@@ -189,12 +189,78 @@ function patchDocUpdateInCaches(path: string, docId: string, updateData: any) {
     }
   }
 
+  dropFilteredCaches(path, baseKey);
+  scheduleStaleCacheSave();
+}
+
+// Drop every cached read for a collection EXCEPT the unfiltered full-collection query
+// (baseKey), which callers patch in place. Filtered/ordered query results and count
+// aggregations can change when a document's fields change or membership changes, so they
+// are invalidated and lazily rebuilt (a filtered query / a count is cheap next to a full
+// collection scan).
+function dropFilteredCaches(path: string, baseKey: string) {
   for (const key in firestoreCache) {
     if (key === baseKey) continue;
     if (key.startsWith(`query:${path}:`) || key.startsWith(`count:${path}:`)) {
       delete firestoreCache[key];
     }
   }
+}
+
+// Apply a document SET (create or full overwrite) to the caches instead of invalidating
+// every cached read. A set replaces the whole document, so we replace the doc cache and
+// the doc's entry in the unfiltered full-collection query cache — or APPEND it if it's a
+// new document (membership +1). This keeps the expensive full-collection cache warm across
+// creates, so dashboards no longer re-scan all tickets after every new ticket.
+function patchDocSetInCaches(path: string, docId: string, fullData: any) {
+  const norm = normalizeForCache(fullData);
+
+  const docKey = `doc:${path}:${docId}`;
+  const docEntry = firestoreCache[docKey];
+  if (docEntry) {
+    docEntry.data = { exists: true, data: norm };
+    docEntry.timestamp = Date.now();
+    staleFallbackCache[docKey] = docEntry.data;
+  }
+
+  const baseKey = baseCollectionQueryKey(path);
+  const qEntry = firestoreCache[baseKey];
+  if (qEntry?.data?.docs && Array.isArray(qEntry.data.docs)) {
+    const idx = qEntry.data.docs.findIndex((x: any) => x.id === docId);
+    if (idx >= 0) {
+      qEntry.data.docs[idx] = { id: docId, data: norm };
+    } else {
+      qEntry.data.docs.push({ id: docId, data: norm });
+      qEntry.data.empty = false;
+    }
+    staleFallbackCache[baseKey] = qEntry.data;
+  }
+
+  dropFilteredCaches(path, baseKey);
+  scheduleStaleCacheSave();
+}
+
+// Apply a document DELETE to the caches: mark the doc cache as not-found and remove the
+// doc from the unfiltered full-collection query cache (membership -1), keeping that cache
+// warm instead of forcing a full re-scan on the next read.
+function patchDocDeleteInCaches(path: string, docId: string) {
+  const docKey = `doc:${path}:${docId}`;
+  const docEntry = firestoreCache[docKey];
+  if (docEntry) {
+    docEntry.data = { exists: false, data: undefined };
+    docEntry.timestamp = Date.now();
+    staleFallbackCache[docKey] = docEntry.data;
+  }
+
+  const baseKey = baseCollectionQueryKey(path);
+  const qEntry = firestoreCache[baseKey];
+  if (qEntry?.data?.docs && Array.isArray(qEntry.data.docs)) {
+    qEntry.data.docs = qEntry.data.docs.filter((x: any) => x.id !== docId);
+    qEntry.data.empty = qEntry.data.docs.length === 0;
+    staleFallbackCache[baseKey] = qEntry.data;
+  }
+
+  dropFilteredCaches(path, baseKey);
   scheduleStaleCacheSave();
 }
 
@@ -390,7 +456,10 @@ class AdminDocRef {
         const errorText = await res.text();
         throw new Error(`Failed to set document: ${res.statusText} - ${errorText}`);
       }
-      invalidateCache(this.colPath);
+      // A set replaces the whole document. Patch it into the caches (replace if it already
+      // exists, append if it's new) rather than invalidating every cached read for the
+      // collection — this keeps the hot full-collection cache warm across creates.
+      patchDocSetInCaches(this.colPath.replace(/^\/|\/$/g, ""), this.docId, data);
       return await res.json();
     } catch (error: any) {
       console.error(`Error in AdminDocRef.set:`, error);
@@ -443,7 +512,9 @@ class AdminDocRef {
         const errorText = await res.text();
         throw new Error(`Failed to delete document: ${res.statusText} - ${errorText}`);
       }
-      invalidateCache(this.colPath);
+      // Remove the document from the caches rather than invalidating every cached read for
+      // the collection, keeping the hot full-collection cache warm across deletes.
+      patchDocDeleteInCaches(this.colPath.replace(/^\/|\/$/g, ""), this.docId);
       return await res.json();
     } catch (error: any) {
       console.error(`Error in AdminDocRef.delete:`, error);
