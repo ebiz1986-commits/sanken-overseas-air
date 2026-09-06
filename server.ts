@@ -110,6 +110,7 @@ const staleFallbackCache: { [key: string]: any } = {};
 const CACHE_TTL_MS = 1800000; // 30 minutes TTL (writes invalidate the cache, so data stays fresh on changes; longer TTL avoids redundant full-collection re-scans that burn Firestore reads)
 const pendingQueries: { [key: string]: Promise<any> } = {};
 const pendingDocs: { [key: string]: Promise<any> } = {};
+const pendingCounts: { [key: string]: Promise<any> } = {};
 
 const STALE_CACHE_FILE = path.join(process.cwd(), "firestore_stale_cache.json");
 
@@ -130,6 +131,71 @@ function saveStaleCacheToDisk() {
   } catch (err) {
     console.warn("[Cache] Failed to save disk stale cache:", err);
   }
+}
+
+// Debounce disk persistence: the stale cache file is ~1MB, and writing it on every
+// single setCached()/patch was heavy local I/O. Coalesce bursts into one write.
+let staleSaveTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleStaleCacheSave() {
+  if (staleSaveTimer) return;
+  staleSaveTimer = setTimeout(() => {
+    staleSaveTimer = null;
+    saveStaleCacheToDisk();
+  }, 5000);
+  staleSaveTimer.unref?.();
+}
+
+// The canonical cache key for an unfiltered full-collection read (no where/orderBy/limit).
+// This is the "hot" key the dashboard endpoints (metrics, flight-status, project-costs,
+// and the tickets count) all share, so we keep it warm across single-doc updates.
+function baseCollectionQueryKey(path: string): string {
+  return `query:${path}:${JSON.stringify({ from: [{ collectionId: path }] })}`;
+}
+
+// Replace serverTimestamp sentinels with a real ISO string so patched cache entries
+// match the shape fromProto() produces for real timestamp fields.
+function normalizeForCache(data: any): any {
+  const out: any = {};
+  for (const [k, v] of Object.entries(data)) {
+    out[k] = v === "SERVER_TIMESTAMP_SENTINEL" ? new Date().toISOString() : v;
+  }
+  return out;
+}
+
+// Surgically apply a single-document field update to the in-memory caches instead of
+// blowing away every cached read for the collection. An update does NOT change collection
+// membership, so we merge the changed fields into:
+//   - the document cache (doc:<path>:<id>)
+//   - the unfiltered full-collection query cache (kept warm — this is the expensive one)
+// Filtered/ordered query caches and count caches for the collection are dropped, since a
+// field change can move a doc in/out of a filtered result or change a filtered count.
+function patchDocUpdateInCaches(path: string, docId: string, updateData: any) {
+  const norm = normalizeForCache(updateData);
+
+  const docKey = `doc:${path}:${docId}`;
+  const docEntry = firestoreCache[docKey];
+  if (docEntry?.data?.exists && docEntry.data.data) {
+    docEntry.data.data = { ...docEntry.data.data, ...norm };
+    staleFallbackCache[docKey] = docEntry.data;
+  }
+
+  const baseKey = baseCollectionQueryKey(path);
+  const qEntry = firestoreCache[baseKey];
+  if (qEntry?.data?.docs && Array.isArray(qEntry.data.docs)) {
+    const d = qEntry.data.docs.find((x: any) => x.id === docId);
+    if (d) {
+      d.data = { ...d.data, ...norm };
+      staleFallbackCache[baseKey] = qEntry.data;
+    }
+  }
+
+  for (const key in firestoreCache) {
+    if (key === baseKey) continue;
+    if (key.startsWith(`query:${path}:`) || key.startsWith(`count:${path}:`)) {
+      delete firestoreCache[key];
+    }
+  }
+  scheduleStaleCacheSave();
 }
 
 const MAX_CONCURRENT_FIRESTORE_REQUESTS = 5;
@@ -214,7 +280,7 @@ function setCached(key: string, data: any) {
     data
   };
   staleFallbackCache[key] = data;
-  saveStaleCacheToDisk();
+  scheduleStaleCacheSave();
 }
 
 function invalidateCache(colPath?: string) {
@@ -226,7 +292,11 @@ function invalidateCache(colPath?: string) {
   }
   const normalizedPath = colPath.replace(/^\/|\/$/g, "");
   for (const key in firestoreCache) {
-    if (key.startsWith(`doc:${normalizedPath}:`) || key.startsWith(`query:${normalizedPath}:`)) {
+    if (
+      key.startsWith(`doc:${normalizedPath}:`) ||
+      key.startsWith(`query:${normalizedPath}:`) ||
+      key.startsWith(`count:${normalizedPath}:`)
+    ) {
       delete firestoreCache[key];
     }
   }
@@ -349,7 +419,12 @@ class AdminDocRef {
         const errorText = await res.text();
         throw new Error(`Failed to update document: ${res.statusText} - ${errorText}`);
       }
-      invalidateCache(this.colPath);
+      // An update doesn't change collection membership, so patch the changed fields into
+      // the caches in place rather than invalidating every cached read for the collection.
+      // This keeps the hot full-collection cache warm across edits, which is the single
+      // biggest source of redundant Firestore reads (dashboards re-scanning all tickets
+      // after every ticket edit).
+      patchDocUpdateInCaches(this.colPath.replace(/^\/|\/$/g, ""), this.docId, data);
       return await res.json();
     } catch (error: any) {
       console.error(`Error in AdminDocRef.update:`, error);
@@ -574,6 +649,110 @@ class AdminQuery {
         data: () => JSON.parse(JSON.stringify(d.data)),
         ref: { id: d.id }
       }))
+    };
+  }
+
+  // Server-side COUNT via Firestore's aggregation query. Billed as a tiny fixed number of
+  // index reads regardless of how many documents match, instead of streaming (and paying
+  // for) every matching document just to call .length. Mirrors the firebase-admin API:
+  //   const snap = await query.count().get();  snap.data().count
+  count() {
+    const buildFilters = () => {
+      const filters: any[] = [];
+      for (const c of this.constraints) {
+        if (c.type !== "where") continue;
+        let opMapped = "EQUAL";
+        const op = c.op;
+        if (op === "==") opMapped = "EQUAL";
+        else if (op === ">") opMapped = "GREATER_THAN";
+        else if (op === ">=") opMapped = "GREATER_THAN_OR_EQUAL";
+        else if (op === "<") opMapped = "LESS_THAN";
+        else if (op === "<=") opMapped = "LESS_THAN_OR_EQUAL";
+        else if (op === "in") opMapped = "IN";
+        else if (op === "array-contains") opMapped = "ARRAY_CONTAINS";
+        else if (op === "array-contains-any") opMapped = "ARRAY_CONTAINS_ANY";
+        filters.push({
+          fieldFilter: {
+            field: { fieldPath: c.field },
+            op: opMapped,
+            value: toProto(c.val)
+          }
+        });
+      }
+      return filters;
+    };
+
+    const self = this;
+    return {
+      async get() {
+        const path = self.colPath.replace(/^\/|\/$/g, "");
+        const structuredQuery: any = { from: [{ collectionId: path }] };
+        const filters = buildFilters();
+        if (filters.length === 1) {
+          structuredQuery.where = filters[0];
+        } else if (filters.length > 1) {
+          structuredQuery.where = { compositeFilter: { op: "AND", filters } };
+        }
+
+        const cacheKey = `count:${path}:${JSON.stringify(structuredQuery)}`;
+        const cached = getCached(cacheKey);
+        if (cached !== null) {
+          return { data: () => ({ count: cached.count }) };
+        }
+        if (pendingCounts[cacheKey]) {
+          const res = await pendingCounts[cacheKey];
+          return { data: () => ({ count: res.count }) };
+        }
+
+        const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${firestoreDatabaseId}/documents:runAggregationQuery?key=${apiKey}`;
+        const body = {
+          structuredAggregationQuery: {
+            structuredQuery,
+            aggregations: [{ alias: "count", count: {} }]
+          }
+        };
+
+        const fetchPromise = (async () => {
+          try {
+            await acquireFirestoreSemaphore();
+            const res = await fetchWithRetry(url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body)
+            });
+            if (!res.ok) {
+              const errorText = await res.text();
+              throw new Error(`Failed to run count aggregation: ${res.statusText} - ${errorText}`);
+            }
+            const results = await res.json();
+            let count = 0;
+            if (Array.isArray(results)) {
+              for (const item of results) {
+                const raw = item?.result?.aggregateFields?.count;
+                if (raw && "integerValue" in raw) {
+                  count = parseInt(raw.integerValue, 10) || 0;
+                }
+              }
+            }
+            const entry = { count };
+            setCached(cacheKey, entry);
+            return entry;
+          } catch (error: any) {
+            console.error(`Error in AdminQuery.count:`, error);
+            const expiredFallback = getCachedWithExpiredFallback(cacheKey);
+            if (expiredFallback) return expiredFallback;
+            if (staleFallbackCache[cacheKey]) return staleFallbackCache[cacheKey];
+            throw error;
+          } finally {
+            releaseFirestoreSemaphore();
+            delete pendingCounts[cacheKey];
+          }
+        })();
+
+        pendingCounts[cacheKey] = fetchPromise;
+        const result = await fetchPromise;
+        return { data: () => ({ count: result.count }) };
+      }
     };
   }
 }
@@ -1215,10 +1394,11 @@ app.get("/api/tickets", authenticateToken, async (req: any, res: any) => {
       q = q.where('flight_status', '==', req.query.flight_status);
     }
     
-    // Get total matching documents count from the collection/query (cached when possible)
-    const countSnap = await q.get();
-    const total = countSnap.docs.length;
-    
+    // Get total matching documents via a COUNT aggregation (billed as a tiny fixed cost)
+    // instead of streaming every matching document just to read its length.
+    const countSnap = await q.count().get();
+    const total = countSnap.data().count;
+
     q = q.orderBy('created_at', 'desc');
     
     const limit = parseInt(req.query.limit || '1000');
@@ -1257,12 +1437,18 @@ app.get("/api/tickets/:id", authenticateToken, async (req: any, res: any) => {
       .orderBy('timestamp', 'desc')
       .get();
       
-    const usersSnap = await fdb.collection('users').get();
+    // Only fetch the specific users referenced by this ticket's activity log, instead of
+    // reading the entire users collection on every ticket open. Per-doc reads are cached
+    // individually (doc:users:<id>), so repeat views are almost always cache hits.
+    const referencedUserIds = Array.from(
+      new Set(activitySnap.docs.map(aDoc => aDoc.data().user_id).filter(Boolean))
+    );
     const usersMap = new Map<string, any>();
-    usersSnap.docs.forEach(uDoc => {
-      usersMap.set(uDoc.id, uDoc.data());
-    });
-    
+    await Promise.all(referencedUserIds.map(async (uid: string) => {
+      const uDoc = await fdb.collection('users').doc(uid).get();
+      if (uDoc.exists) usersMap.set(uid, uDoc.data());
+    }));
+
     const activity = activitySnap.docs.map(aDoc => {
       const a = aDoc.data();
       const u = usersMap.get(a.user_id);
