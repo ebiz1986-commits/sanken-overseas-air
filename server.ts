@@ -10,6 +10,19 @@ import crypto from "crypto";
 import { GoogleGenAI } from "@google/genai";
 import axios from "axios";
 import firebaseConfig from "./firebase-applet-config.json";
+import {
+  staleFallbackCache,
+  pendingQueries,
+  pendingDocs,
+  pendingCounts,
+  getCached,
+  getCachedWithExpiredFallback,
+  setCached,
+  invalidateCache,
+  patchDocUpdateInCaches,
+  patchDocSetInCaches,
+  patchDocDeleteInCaches,
+} from "./firestoreCache";
 
 const { projectId, apiKey } = firebaseConfig as any;
 const firestoreDatabaseId = (firebaseConfig as any).firestoreDatabaseId || "(default)";
@@ -100,170 +113,6 @@ function getGeminiClient(): GoogleGenAI {
   return geminiClient;
 }
 
-interface CacheEntry {
-  timestamp: number;
-  data: any;
-}
-
-const firestoreCache: { [key: string]: CacheEntry } = {};
-const staleFallbackCache: { [key: string]: any } = {};
-const CACHE_TTL_MS = 1800000; // 30 minutes TTL (writes invalidate the cache, so data stays fresh on changes; longer TTL avoids redundant full-collection re-scans that burn Firestore reads)
-const pendingQueries: { [key: string]: Promise<any> } = {};
-const pendingDocs: { [key: string]: Promise<any> } = {};
-const pendingCounts: { [key: string]: Promise<any> } = {};
-
-const STALE_CACHE_FILE = path.join(process.cwd(), "firestore_stale_cache.json");
-
-// Load stale cache from disk on startup
-try {
-  if (fs.existsSync(STALE_CACHE_FILE)) {
-    const content = fs.readFileSync(STALE_CACHE_FILE, "utf-8");
-    Object.assign(staleFallbackCache, JSON.parse(content));
-    console.log(`[Cache] Loaded ${Object.keys(staleFallbackCache).length} entries from disk stale cache fallback.`);
-  }
-} catch (err) {
-  console.warn("[Cache] Failed to load disk stale cache:", err);
-}
-
-function saveStaleCacheToDisk() {
-  try {
-    fs.writeFileSync(STALE_CACHE_FILE, JSON.stringify(staleFallbackCache, null, 2), "utf-8");
-  } catch (err) {
-    console.warn("[Cache] Failed to save disk stale cache:", err);
-  }
-}
-
-// Debounce disk persistence: the stale cache file is ~1MB, and writing it on every
-// single setCached()/patch was heavy local I/O. Coalesce bursts into one write.
-let staleSaveTimer: ReturnType<typeof setTimeout> | null = null;
-function scheduleStaleCacheSave() {
-  if (staleSaveTimer) return;
-  staleSaveTimer = setTimeout(() => {
-    staleSaveTimer = null;
-    saveStaleCacheToDisk();
-  }, 5000);
-  staleSaveTimer.unref?.();
-}
-
-// The canonical cache key for an unfiltered full-collection read (no where/orderBy/limit).
-// This is the "hot" key the dashboard endpoints (metrics, flight-status, project-costs,
-// and the tickets count) all share, so we keep it warm across single-doc updates.
-function baseCollectionQueryKey(path: string): string {
-  return `query:${path}:${JSON.stringify({ from: [{ collectionId: path }] })}`;
-}
-
-// Replace serverTimestamp sentinels with a real ISO string so patched cache entries
-// match the shape fromProto() produces for real timestamp fields.
-function normalizeForCache(data: any): any {
-  const out: any = {};
-  for (const [k, v] of Object.entries(data)) {
-    out[k] = v === "SERVER_TIMESTAMP_SENTINEL" ? new Date().toISOString() : v;
-  }
-  return out;
-}
-
-// Surgically apply a single-document field update to the in-memory caches instead of
-// blowing away every cached read for the collection. An update does NOT change collection
-// membership, so we merge the changed fields into:
-//   - the document cache (doc:<path>:<id>)
-//   - the unfiltered full-collection query cache (kept warm — this is the expensive one)
-// Filtered/ordered query caches and count caches for the collection are dropped, since a
-// field change can move a doc in/out of a filtered result or change a filtered count.
-function patchDocUpdateInCaches(path: string, docId: string, updateData: any) {
-  const norm = normalizeForCache(updateData);
-
-  const docKey = `doc:${path}:${docId}`;
-  const docEntry = firestoreCache[docKey];
-  if (docEntry?.data?.exists && docEntry.data.data) {
-    docEntry.data.data = { ...docEntry.data.data, ...norm };
-    staleFallbackCache[docKey] = docEntry.data;
-  }
-
-  const baseKey = baseCollectionQueryKey(path);
-  const qEntry = firestoreCache[baseKey];
-  if (qEntry?.data?.docs && Array.isArray(qEntry.data.docs)) {
-    const d = qEntry.data.docs.find((x: any) => x.id === docId);
-    if (d) {
-      d.data = { ...d.data, ...norm };
-      staleFallbackCache[baseKey] = qEntry.data;
-    }
-  }
-
-  dropFilteredCaches(path, baseKey);
-  scheduleStaleCacheSave();
-}
-
-// Drop every cached read for a collection EXCEPT the unfiltered full-collection query
-// (baseKey), which callers patch in place. Filtered/ordered query results and count
-// aggregations can change when a document's fields change or membership changes, so they
-// are invalidated and lazily rebuilt (a filtered query / a count is cheap next to a full
-// collection scan).
-function dropFilteredCaches(path: string, baseKey: string) {
-  for (const key in firestoreCache) {
-    if (key === baseKey) continue;
-    if (key.startsWith(`query:${path}:`) || key.startsWith(`count:${path}:`)) {
-      delete firestoreCache[key];
-    }
-  }
-}
-
-// Apply a document SET (create or full overwrite) to the caches instead of invalidating
-// every cached read. A set replaces the whole document, so we replace the doc cache and
-// the doc's entry in the unfiltered full-collection query cache — or APPEND it if it's a
-// new document (membership +1). This keeps the expensive full-collection cache warm across
-// creates, so dashboards no longer re-scan all tickets after every new ticket.
-function patchDocSetInCaches(path: string, docId: string, fullData: any) {
-  const norm = normalizeForCache(fullData);
-
-  const docKey = `doc:${path}:${docId}`;
-  const docEntry = firestoreCache[docKey];
-  if (docEntry) {
-    docEntry.data = { exists: true, data: norm };
-    docEntry.timestamp = Date.now();
-    staleFallbackCache[docKey] = docEntry.data;
-  }
-
-  const baseKey = baseCollectionQueryKey(path);
-  const qEntry = firestoreCache[baseKey];
-  if (qEntry?.data?.docs && Array.isArray(qEntry.data.docs)) {
-    const idx = qEntry.data.docs.findIndex((x: any) => x.id === docId);
-    if (idx >= 0) {
-      qEntry.data.docs[idx] = { id: docId, data: norm };
-    } else {
-      qEntry.data.docs.push({ id: docId, data: norm });
-      qEntry.data.empty = false;
-    }
-    staleFallbackCache[baseKey] = qEntry.data;
-  }
-
-  dropFilteredCaches(path, baseKey);
-  scheduleStaleCacheSave();
-}
-
-// Apply a document DELETE to the caches: mark the doc cache as not-found and remove the
-// doc from the unfiltered full-collection query cache (membership -1), keeping that cache
-// warm instead of forcing a full re-scan on the next read.
-function patchDocDeleteInCaches(path: string, docId: string) {
-  const docKey = `doc:${path}:${docId}`;
-  const docEntry = firestoreCache[docKey];
-  if (docEntry) {
-    docEntry.data = { exists: false, data: undefined };
-    docEntry.timestamp = Date.now();
-    staleFallbackCache[docKey] = docEntry.data;
-  }
-
-  const baseKey = baseCollectionQueryKey(path);
-  const qEntry = firestoreCache[baseKey];
-  if (qEntry?.data?.docs && Array.isArray(qEntry.data.docs)) {
-    qEntry.data.docs = qEntry.data.docs.filter((x: any) => x.id !== docId);
-    qEntry.data.empty = qEntry.data.docs.length === 0;
-    staleFallbackCache[baseKey] = qEntry.data;
-  }
-
-  dropFilteredCaches(path, baseKey);
-  scheduleStaleCacheSave();
-}
-
 const MAX_CONCURRENT_FIRESTORE_REQUESTS = 5;
 let activeFirestoreRequests = 0;
 const firestoreRequestQueue: (() => void)[] = [];
@@ -285,22 +134,6 @@ function releaseFirestoreSemaphore() {
     const next = firestoreRequestQueue.shift();
     if (next) next();
   }
-}
-
-function getCached(key: string): any | null {
-  const entry = firestoreCache[key];
-  if (entry && (Date.now() - entry.timestamp < CACHE_TTL_MS)) {
-    return entry.data;
-  }
-  return null;
-}
-
-function getCachedWithExpiredFallback(key: string): any | null {
-  const entry = firestoreCache[key];
-  if (entry) {
-    return entry.data;
-  }
-  return null;
 }
 
 async function fetchWithRetry(url: string, options: any = {}, retries = 4, delay = 500): Promise<Response> {
@@ -337,34 +170,6 @@ async function fetchWithRetry(url: string, options: any = {}, retries = 4, delay
       return fetchWithRetry(url, options, retries - 1, nextDelay);
     }
     throw err;
-  }
-}
-
-function setCached(key: string, data: any) {
-  firestoreCache[key] = {
-    timestamp: Date.now(),
-    data
-  };
-  staleFallbackCache[key] = data;
-  scheduleStaleCacheSave();
-}
-
-function invalidateCache(colPath?: string) {
-  if (!colPath) {
-    for (const key in firestoreCache) {
-      delete firestoreCache[key];
-    }
-    return;
-  }
-  const normalizedPath = colPath.replace(/^\/|\/$/g, "");
-  for (const key in firestoreCache) {
-    if (
-      key.startsWith(`doc:${normalizedPath}:`) ||
-      key.startsWith(`query:${normalizedPath}:`) ||
-      key.startsWith(`count:${normalizedPath}:`)
-    ) {
-      delete firestoreCache[key];
-    }
   }
 }
 
