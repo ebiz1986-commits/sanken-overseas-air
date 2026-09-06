@@ -4,6 +4,8 @@
 
 # Run and deploy your AI Studio app
 
+[![CI](https://github.com/ebiz1986-commits/sanken-overseas-air/actions/workflows/ci.yml/badge.svg)](https://github.com/ebiz1986-commits/sanken-overseas-air/actions/workflows/ci.yml)
+
 This contains everything you need to run your app locally.
 
 View your app in AI Studio: https://ai.studio/apps/82eac3fc-d2ee-4749-a288-71cf6d2a000e
