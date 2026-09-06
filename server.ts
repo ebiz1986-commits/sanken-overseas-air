@@ -3519,10 +3519,11 @@ app.get("/api/sharepoint/logs", authenticateToken, async (req: any, res: any) =>
     return res.status(403).json({ detail: "Access denied." });
   }
   try {
-    const logsSnap = await fdb.collection('sharepoint_logs').get();
+    // Read only the newest 100 at the DB level. The logs collections grow without
+    // bound, so reading the whole thing and slicing in JS costs more every week.
+    const logsSnap = await fdb.collection('sharepoint_logs').orderBy('timestamp', 'desc').limit(100).get();
     const logs = logsSnap.docs.map(doc => doc.data());
-    const sorted = logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    res.json({ logs: sorted.slice(0, 100) }); // Limit to last 100 entries
+    res.json({ logs });
   } catch (error: any) {
     console.error("Error fetching SharePoint logs:", error);
     res.status(500).json({ detail: "Failed to load sync logs." });
@@ -3625,10 +3626,10 @@ app.get("/api/gdrive/logs", authenticateToken, async (req: any, res: any) => {
     return res.status(403).json({ detail: "Access denied." });
   }
   try {
-    const logsSnap = await fdb.collection('gdrive_logs').get();
+    // Read only the newest 100 at the DB level (the collection grows unbounded).
+    const logsSnap = await fdb.collection('gdrive_logs').orderBy('timestamp', 'desc').limit(100).get();
     const logs = logsSnap.docs.map(doc => doc.data());
-    const sorted = logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    res.json({ logs: sorted.slice(0, 100) });
+    res.json({ logs });
   } catch (error: any) {
     console.error("Error fetching Google Drive logs:", error);
     res.status(500).json({ detail: "Failed to load Google Drive sync logs." });
@@ -3663,10 +3664,10 @@ app.get("/api/gdrive/backup-logs", authenticateToken, async (req: any, res: any)
     return res.status(403).json({ detail: "Access denied." });
   }
   try {
-    const logsSnap = await fdb.collection('gdrive_backup_logs').get();
+    // Read only the newest 100 at the DB level (the collection grows unbounded).
+    const logsSnap = await fdb.collection('gdrive_backup_logs').orderBy('timestamp', 'desc').limit(100).get();
     const logs = logsSnap.docs.map(doc => doc.data());
-    const sorted = logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    res.json({ logs: sorted.slice(0, 100) });
+    res.json({ logs });
   } catch (error: any) {
     console.error("Error fetching Google Drive backup logs:", error);
     res.status(500).json({ detail: "Failed to load Google Drive database backup logs." });
@@ -3752,8 +3753,10 @@ setInterval(async () => {
         if (dayOfWeek === scheduledDay && hour >= scheduledHour) {
           const todayStr = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`;
           
-          // Check if we already succeeded for todayStr
-          const logsSnap = await fdb.collection('sharepoint_logs').get();
+          // Check if we already succeeded for todayStr. Only the most recent logs can
+          // be from today, so read a bounded window instead of the whole (unbounded)
+          // collection.
+          const logsSnap = await fdb.collection('sharepoint_logs').orderBy('timestamp', 'desc').limit(50).get();
           const logs = logsSnap.docs.map(doc => doc.data());
 
           const alreadySucceeded = logs.some((l: any) => {
@@ -3795,8 +3798,10 @@ setInterval(async () => {
         if (dayOfWeek === scheduledDay && hour >= scheduledHour) {
           const todayStr = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`;
           
-          // Check if we already succeeded for todayStr
-          const logsSnap = await fdb.collection('gdrive_logs').get();
+          // Check if we already succeeded for todayStr. Only the most recent logs can
+          // be from today, so read a bounded window instead of the whole (unbounded)
+          // collection.
+          const logsSnap = await fdb.collection('gdrive_logs').orderBy('timestamp', 'desc').limit(50).get();
           const logs = logsSnap.docs.map(doc => doc.data());
 
           const alreadySucceeded = logs.some((l: any) => {
