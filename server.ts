@@ -1261,38 +1261,42 @@ app.post("/api/tickets", authenticateToken, async (req: any, res: any) => {
 
 app.get("/api/tickets", authenticateToken, async (req: any, res: any) => {
   try {
-    let q: any = fdb.collection('tickets');
-    
+    // Read the whole collection unfiltered and do filtering/sorting/pagination in memory.
+    // This shares the single "hot" full-collection cache with the dashboard endpoints
+    // (metrics, flight-status, project-costs), which the write-patching keeps warm across
+    // edits — so filtered and paginated ticket reads cost zero Firestore reads when warm,
+    // instead of each filter/limit combination being its own cache key that got wiped on
+    // every write.
+    const snap = await fdb.collection('tickets').get();
+    let tickets = snap.docs.map(doc => {
+      const d = doc.data();
+      return {
+        ...d,
+        created_at: d.created_at?.toDate?.()?.toISOString() || d.created_at,
+        updated_at: d.updated_at?.toDate?.()?.toISOString() || d.updated_at,
+      };
+    });
+
     if (req.query.project_id) {
-      q = q.where('project_id', '==', req.query.project_id);
+      tickets = tickets.filter((t: any) => t.project_id === req.query.project_id);
     }
     if (req.query.flight_status) {
-      q = q.where('flight_status', '==', req.query.flight_status);
+      tickets = tickets.filter((t: any) => t.flight_status === req.query.flight_status);
     }
-    
-    // Get total matching documents via a COUNT aggregation (billed as a tiny fixed cost)
-    // instead of streaming every matching document just to read its length.
-    const countSnap = await q.count().get();
-    const total = countSnap.data().count;
 
-    q = q.orderBy('created_at', 'desc');
-    
+    // Newest first, matching the previous orderBy('created_at', 'desc').
+    tickets.sort((a: any, b: any) => {
+      const ta = a.created_at ? Date.parse(a.created_at) : 0;
+      const tb = b.created_at ? Date.parse(b.created_at) : 0;
+      return (isNaN(tb) ? 0 : tb) - (isNaN(ta) ? 0 : ta);
+    });
+
+    const total = tickets.length;
     const limit = parseInt(req.query.limit || '1000');
     const offset = parseInt(req.query.offset || '0');
-    q = q.limit(limit);
-    if (offset > 0) {
-      q = q.offset(offset);
-    }
-    
-    const snap = await q.get();
-    const tickets = snap.docs.map(doc => ({
-      ...doc.data(),
-      // Handle timestamps for JSON
-      created_at: doc.data().created_at?.toDate?.()?.toISOString() || doc.data().created_at,
-      updated_at: doc.data().updated_at?.toDate?.()?.toISOString() || doc.data().updated_at,
-    }));
-    
-    res.json({ tickets, total });
+    const page = tickets.slice(offset, offset + limit);
+
+    res.json({ tickets: page, total });
   } catch (e: any) {
     console.error("Error fetching tickets:", e);
     const msg = (e?.message || "").toLowerCase();
@@ -2726,7 +2730,8 @@ app.post("/api/projects", authenticateToken, async (req: any, res: any) => {
 
     const id = "PROJ-" + crypto.randomUUID();
     await fdb.collection('projects').doc(id).set({ ...req.body, name, id });
-    invalidateCache();
+    // Scope to 'projects' only — a project write must not wipe the hot tickets cache.
+    invalidateCache('projects');
     res.json({ id, ...req.body, name });
   } catch (error: any) {
     console.error("Error creating project:", error);
@@ -2754,7 +2759,8 @@ app.put("/api/projects/:id", authenticateToken, async (req: any, res: any) => {
       }
     }
     await fdb.collection('projects').doc(id).update(req.body);
-    invalidateCache();
+    // Scope to 'projects' only — a project write must not wipe the hot tickets cache.
+    invalidateCache('projects');
     res.json({ id: req.params.id, ...req.body });
   } catch (error: any) {
     console.error("Error updating project:", error);
@@ -2772,7 +2778,8 @@ app.delete("/api/projects/:id", authenticateToken, async (req: any, res: any) =>
   }
   try {
     await fdb.collection('projects').doc(req.params.id).delete();
-    invalidateCache();
+    // Scope to 'projects' only — a project write must not wipe the hot tickets cache.
+    invalidateCache('projects');
     res.json({ success: true });
   } catch (error: any) {
     console.error("Error deleting project:", error);
