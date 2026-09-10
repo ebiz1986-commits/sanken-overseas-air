@@ -3,6 +3,8 @@ import { format } from 'date-fns';
 import { X, AlertCircle, Upload } from 'lucide-react';
 import { processAndCompressFile } from '../lib/fileCompressor';
 import { uploadDataUriToStorage } from '../lib/storageUpload';
+import { computeEntitlements } from '../lib/entitlement';
+import EntitlementBalance from './EntitlementBalance';
 import api from '../api';
 import toast from 'react-hot-toast';
 import { useFormValidation } from '../hooks/useFormValidation';
@@ -55,96 +57,18 @@ export default function EditStage1Modal({ isOpen, onClose, ticket, projects, tic
     subcontractor_entitlement_applied: false
   });
 
-  const entitlementInfo = React.useMemo(() => {
-    const selectedProjectId = formData.project_id || (formData.project_ids && formData.project_ids[0]);
-    const selectedCompany = formData.company;
-
-    if (!selectedProjectId || !selectedCompany) {
-      return null;
-    }
-
-    const proj = projects.find(p => p.id === selectedProjectId);
-    if (!proj) return null;
-
-    const cycles = proj.company_entitlement_cycles || {};
-    const periods = proj.company_entitlement_periods || {};
-    const starts = proj.company_entitlement_starts || {};
-
-    const cycle = cycles[selectedCompany] || 'PROJECT_PERIOD';
-    const periodMonths = parseInt(String(periods[selectedCompany] || '12')) || 12;
-    const startDateStr = starts[selectedCompany] || '';
-
-    let initial = 0;
-    const companyEnts = proj.company_entitlements || {};
-    if (selectedCompany && companyEnts[selectedCompany] !== undefined) {
-      initial = parseInt(String(companyEnts[selectedCompany])) || 0;
-    } else {
-      initial = parseInt(proj.entitlement_total) || 0;
-    }
-
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
-
-    const previouslyApplied = loadedTickets.filter(t => {
-      const isApplied = !!t.subcontractor_entitlement_applied;
-      const matchesProject = t.project_id === selectedProjectId || (Array.isArray(t.project_ids) && t.project_ids.includes(selectedProjectId));
-      const matchesCompany = String(t.company || '').trim().toLowerCase() === selectedCompany.trim().toLowerCase();
-      const isNotCurrent = t.id !== ticket.id;
-      if (!isApplied || !matchesProject || !matchesCompany || !isNotCurrent) return false;
-
-      if (cycle === 'MONTHLY') {
-        const dateStr = t.ticket_arranged_date || t.created_at || t.departure_date;
-        if (!dateStr) return false;
-        try {
-          const d = new Date(dateStr);
-          if (isNaN(d.getTime())) return false;
-          return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
-        } catch {
-          return false;
-        }
-      }
-      return true;
-    }).length;
-
-    const currentBatchCount = 1;
-    const remainingBefore = initial - previouslyApplied;
-    const remainingAfter = remainingBefore - currentBatchCount;
-    const isExceeded = remainingAfter < 0;
-    const exceedBy = isExceeded ? Math.abs(remainingAfter) : 0;
-
-    let isExpired = false;
-    let expirationWarningStr = '';
-    if (cycle === 'PROJECT_PERIOD' && startDateStr) {
-      try {
-        const start = new Date(startDateStr);
-        if (!isNaN(start.getTime())) {
-          const expiryDate = new Date(start);
-          expiryDate.setMonth(expiryDate.getMonth() + periodMonths);
-          if (now > expiryDate) {
-            isExpired = true;
-            expirationWarningStr = `The pre-agreed entitlement period of ${periodMonths} months starting from ${startDateStr} expired on ${expiryDate.toISOString().split('T')[0]}.`;
-          }
-        }
-      } catch (err) {
-        console.error("Error evaluating expiry:", err);
-      }
-    }
-
-    return {
-      initial,
-      cycle,
-      periodMonths,
-      startDateStr,
-      previouslyApplied,
-      currentBatchCount,
-      remainingBefore,
-      remainingAfter,
-      isExceeded,
-      exceedBy,
-      isExpired,
-      expirationWarningStr
-    };
+  const entitlements = React.useMemo(() => {
+    const selectedProjectIds = (formData.project_ids && formData.project_ids.length > 0)
+      ? formData.project_ids
+      : (formData.project_id ? [formData.project_id] : []);
+    return computeEntitlements({
+      company: formData.company,
+      selectedProjectIds,
+      batchCount: 1,
+      loadedTickets,
+      projects,
+      excludeTicketId: ticket.id,
+    });
   }, [formData.project_id, formData.project_ids, formData.company, loadedTickets, projects, ticket.id]);
 
   const [isAddingNewAgent, setIsAddingNewAgent] = useState(false);
@@ -305,8 +229,8 @@ export default function EditStage1Modal({ isOpen, onClose, ticket, projects, tic
     }
     setLoading(true);
     try {
-      const exceeded = !!(formData.subcontractor_entitlement_applied && entitlementInfo && entitlementInfo.isExceeded);
-      const exceed_by = formData.subcontractor_entitlement_applied && entitlementInfo ? entitlementInfo.exceedBy : 0;
+      const exceeded = !!(formData.subcontractor_entitlement_applied && entitlements && entitlements.anyExceeded);
+      const exceed_by = formData.subcontractor_entitlement_applied && entitlements ? entitlements.totalExceedBy : 0;
 
       await api.put(`/tickets/${ticket.id}`, {
         ...formData,
@@ -485,72 +409,8 @@ export default function EditStage1Modal({ isOpen, onClose, ticket, projects, tic
                       <AlertCircle className="w-4 h-4 shrink-0" />
                       Please select both a Project and a Re; company to view current subcontractor ticket entitlement balances.
                     </p>
-                  ) : entitlementInfo ? (
-                    <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-3xs space-y-2">
-                      <div className="flex justify-between items-center text-slate-500 pb-1.5 border-b border-slate-100">
-                        <span className="font-semibold text-slate-700">Entitlement Balance Details</span>
-                        <span className="font-mono bg-sky-50 text-sky-700 border border-sky-200 px-2 py-0.5 rounded text-[10px] uppercase font-bold">
-                          {entitlementInfo.cycle === 'MONTHLY' ? '🗓️ Monthly Reset' : `🏗️ Project Period (${entitlementInfo.periodMonths}M)`}
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-slate-500 font-medium">
-                        Company: <strong className="text-slate-700">{formData.company}</strong>
-                        {entitlementInfo.cycle === 'PROJECT_PERIOD' && entitlementInfo.startDateStr && (
-                          <span className="ml-2">• Starts: <strong className="text-slate-700">{entitlementInfo.startDateStr}</strong></span>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-slate-600 font-mono">
-                        <div className="bg-slate-50 p-1.5 rounded">
-                          <p className="text-[10px] text-slate-400 font-sans uppercase font-medium">Total Initial</p>
-                          <p className="text-sm font-extrabold text-slate-800">{entitlementInfo.initial}</p>
-                        </div>
-                        <div className="bg-slate-50 p-1.5 rounded">
-                          <p className="text-[10px] text-slate-400 font-sans uppercase font-medium">
-                            {entitlementInfo.cycle === 'MONTHLY' ? 'Used This Month' : 'Previously Used'}
-                          </p>
-                          <p className="text-sm font-extrabold text-amber-600">{entitlementInfo.previouslyApplied}</p>
-                        </div>
-                        <div className="bg-slate-50 p-1.5 rounded">
-                          <p className="text-[10px] text-slate-400 font-sans uppercase font-medium">This Ticket</p>
-                          <p className="text-sm font-extrabold text-sky-600">{entitlementInfo.currentBatchCount}</p>
-                        </div>
-                        <div className={`p-1.5 rounded ${entitlementInfo.remainingAfter < 0 ? 'bg-rose-50 border border-rose-100' : 'bg-emerald-50 border border-emerald-100'}`}>
-                          <p className="text-[10px] text-slate-400 font-sans uppercase font-medium">Net Remaining</p>
-                          <p className={`text-sm font-extrabold ${entitlementInfo.remainingAfter < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                            {entitlementInfo.remainingAfter}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      {entitlementInfo.isExpired && (
-                        <div className="p-2.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg flex items-start gap-2 mt-2 leading-relaxed">
-                          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 animate-pulse" />
-                          <div>
-                            <p className="font-bold text-xs">⚠️ Entitlement Period Expired!</p>
-                            <p className="text-[11px] text-amber-700">
-                              {entitlementInfo.expirationWarningStr}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
-                      {entitlementInfo.isExceeded ? (
-                        <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg flex items-start gap-2 mt-2 leading-relaxed">
-                          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600 " />
-                          <div>
-                            <p className="font-bold">🚨 Ticket Entitlement Limit Exceeded!</p>
-                            <p className="text-[11px] text-rose-600">
-                              Warning: This ticket will exceed the agreed limit of <strong>{entitlementInfo.initial}</strong> tickets configured. It will be recorded as <strong>exceeded by {entitlementInfo.exceedBy}</strong> ticket(s) under this project's company entitlements.
-                            </p>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="p-2 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-100 flex items-center gap-2 mt-2 font-medium">
-                          <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping" />
-                          <span>Within safe entitlement allowance. ({entitlementInfo.remainingAfter} slots left after this ticket)</span>
-                        </div>
-                      )}
-                    </div>
+                  ) : entitlements ? (
+                    <EntitlementBalance entitlements={entitlements} company={formData.company} />
                   ) : null}
                 </div>
               )}
