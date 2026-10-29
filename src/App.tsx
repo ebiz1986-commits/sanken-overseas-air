@@ -1,13 +1,25 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore, useThemeStore } from './store';
 import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import TicketDetails from './pages/TicketDetails';
-import Settings from './pages/Settings';
-import SadminDashboard from './pages/SadminDashboard';
 import { LogOut } from 'lucide-react';
+
+// Heavy authenticated pages are code-split so they are not part of the initial
+// bundle. Dashboard in particular is very large; lazy-loading it keeps first
+// paint fast and only downloads a page's chunk when the route is visited.
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const TicketDetails = lazy(() => import('./pages/TicketDetails'));
+const Settings = lazy(() => import('./pages/Settings'));
+const SadminDashboard = lazy(() => import('./pages/SadminDashboard'));
+
+function RouteFallback() {
+  return (
+    <div className="flex items-center justify-center py-24 text-slate-400 text-sm">
+      Loading…
+    </div>
+  );
+}
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((state) => state.token);
@@ -130,14 +142,16 @@ export default function App() {
     <>
       <BrowserRouter>
         <Navigation />
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/sadmin" element={<ProtectedRoute><SadminDashboard /></ProtectedRoute>} />
-          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-          <Route path="/tickets/:id" element={<ProtectedRoute><TicketDetails /></ProtectedRoute>} />
-          <Route path="/" element={<Navigate to="/dashboard" />} />
-        </Routes>
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/sadmin" element={<ProtectedRoute><SadminDashboard /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/tickets/:id" element={<ProtectedRoute><TicketDetails /></ProtectedRoute>} />
+            <Route path="/" element={<Navigate to="/dashboard" />} />
+          </Routes>
+        </Suspense>
       </BrowserRouter>
       <Toaster position="top-right" />
     </>

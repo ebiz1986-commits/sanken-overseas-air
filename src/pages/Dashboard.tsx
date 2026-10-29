@@ -1401,71 +1401,38 @@ export default function Dashboard() {
     }
   };
 
-  const fetchRemainingTicketsInBatches = async (startOffset: number, total: number, fetchId: number) => {
-    let currentOffset = startOffset;
-    const batchSize = 200;
-    while (currentOffset < total) {
-      if (fetchId !== fetchIdRef.current) return;
-      try {
-        const res = await api.get(`/tickets?limit=${batchSize}&offset=${currentOffset}`);
-        if (fetchId !== fetchIdRef.current) return;
-        const newTickets = res.data?.tickets || [];
-        if (newTickets.length === 0) break;
-        
-        setTickets(prev => {
-          if (fetchId !== fetchIdRef.current) return prev;
-          const existingIds = new Set(prev.map(tk => tk.id));
-          const filtered = newTickets.filter((tk: any) => !existingIds.has(tk.id));
-          const merged = [...prev, ...filtered];
-          setSyncedCount(merged.length);
-          return merged;
-        });
-        
-        currentOffset += batchSize;
-      } catch (err) {
-        console.error("Error fetching ticket batch:", err);
-        break;
-      }
-    }
-    if (fetchId === fetchIdRef.current) {
-      setBackgroundSyncing(false);
-    }
-  };
-
   const fetchData = async () => {
     if (!token) return;
     const currentFetchId = ++fetchIdRef.current;
     try {
+      // The server reads the whole tickets collection on every call and only
+      // slices it in memory, so paging in 100-row batches meant N sequential
+      // full-collection reads. One request with a high limit returns everything
+      // in a single round trip.
       const [m, f, p, t, o] = await Promise.all([
         api.get('/dashboard/metrics'),
         api.get('/dashboard/flight-status'),
         api.get('/dashboard/project-costs'),
-        api.get('/tickets?limit=100&offset=0'),
+        api.get('/tickets?limit=100000&offset=0'),
         api.get('/options')
       ]);
-      
+
       if (currentFetchId !== fetchIdRef.current) return;
-      
+
       setMetrics(m?.data || null);
       setFlightStatus(f?.data || {});
       const projData = (p?.data?.projects || []).filter((proj: any) => proj.budget > 0 || proj.spent > 0 || proj.pending > 0);
       setProjects(projData);
       setCompanies(p?.data?.companies || []);
-      
-      const firstBatch = t?.data?.tickets || [];
-      setTickets(firstBatch);
+
+      const allTickets = t?.data?.tickets || [];
+      setTickets(allTickets);
       setOptions(o?.data || []);
-      
-      const totalTickets = t?.data?.total || 0;
+
+      const totalTickets = t?.data?.total || allTickets.length;
       setTotalCount(totalTickets);
-      setSyncedCount(firstBatch.length);
-      
-      if (totalTickets > firstBatch.length) {
-        setBackgroundSyncing(true);
-        fetchRemainingTicketsInBatches(firstBatch.length, totalTickets, currentFetchId);
-      } else {
-        setBackgroundSyncing(false);
-      }
+      setSyncedCount(allTickets.length);
+      setBackgroundSyncing(false);
     } catch (error: any) {
       if (error.response?.status !== 401) {
         toast.error(error.response?.data?.detail || 'Failed to load dashboard data');
